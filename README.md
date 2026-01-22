@@ -73,7 +73,7 @@ The system is built using a modular monolithic architecture (with the possibilit
 - ### Backend Foundation
 - ✅ Docker setup
 - ✅ Models & Migrations
-- ⬜ JWT Authentication     
+- ✅ JWT Authentication     
 - ⬜ User CRUD
 - ⬜ Basic API structure
 
