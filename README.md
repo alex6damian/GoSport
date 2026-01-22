@@ -1,4 +1,4 @@
-# 🏟️ GoSport (Proiect Licență)
+# 🏟️ GoSport (Bachelor Thesis Project)
 
 ![Go](https://img.shields.io/badge/Backend-Go-00ADD8?style=flat&logo=go)
 ![React](https://img.shields.io/badge/Frontend-React-61DAFB?style=flat&logo=react)
@@ -6,66 +6,102 @@
 ![MinIO](https://img.shields.io/badge/Storage-MinIO-C72C48?style=flat&logo=minio)
 ![Docker](https://img.shields.io/badge/Deploy-Docker-2496ED?style=flat&logo=docker)
 
-> **Platformă de conținut sportiv VOD & News**  
-> Un serviciu video hibrid (YouTube + Netflix) dedicat sportului, incluzând procesare video HLS, ingestie de știri și recomandări personalizate.
+> **Sports VOD & News Content Platform**  
+> A hybrid video service (YouTube + Netflix–style) dedicated to sports, featuring HLS video processing, news ingestion, and personalized recommendations.
 
 ---
 
-## 📖 Despre Proiect
+## 📖 About the Project
 
-Acest proiect reprezintă lucrarea mea de licență și are ca scop dezvoltarea unui prototip funcțional pentru o platformă de streaming video și agregare de știri sportive. Utilizatorii își pot selecta sporturile preferate, pot urmări creatori de conținut și primesc un feed personalizat de știri și videoclipuri.
+This project represents my bachelor’s thesis and aims to develop a functional prototype for a sports-focused video streaming and news aggregation platform. Users can select their favorite sports, follow content creators, and receive a personalized feed of news and videos.
 
-Principalele provocări tehnice abordate:
-- **Transcodare Video:** Procesare asincronă folosind FFmpeg pentru livrare HLS (Adaptive Bitrate Streaming).
-- **Căutare Full-Text:** Indexare rapidă a știrilor folosind Meilisearch.
-- **Scalabilitate:** Arhitectură modulară pregătită pentru containerizare.
+Main technical challenges addressed:
+- **Video Transcoding:** Asynchronous processing using FFmpeg for HLS delivery (Adaptive Bitrate Streaming).
+- **Full-Text Search:** Fast news indexing using Meilisearch.
+- **Scalability:** Modular architecture designed with containerization in mind.
 
 ---
 
-## 🏗️ Arhitectură
+## 🏗️ Architecture
 
-Sistemul este construit pe o arhitectură monolitică modulară (cu posibilitate de spargere în microservicii), separând procesarea video (CPU intensive) de API-ul principal.
+The system is built using a modular monolithic architecture (with the possibility of being split into microservices), separating video processing (CPU-intensive workloads) from the main API.
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Componentă | Tehnologie | Rol |
-|------------|------------|-----|
-| **Backend** | Go (Golang) | API REST, Business Logic, Auth (JWT) |
-| **Worker** | Go + FFmpeg | Procesare video, generare HLS și Thumbnails |
-| **Frontend** | React + hls.js | Interfața utilizator și player video |
-| **Database** | PostgreSQL | Stocare persistentă (utilizatori, metadate, feed) |
-| **Storage** | MinIO | Object Storage compatibil S3 pentru fișiere video |
-| **Search** | Meilisearch | Motor de căutare pentru știri și transcripturi |
-| **Metrics** | Prometheus | Monitorizare și observabilitate |
+| Component | Technology | Role |
+|----------|------------|------|
+| **Backend** | Go + Fiber | REST API, Business Logic, Auth (JWT) |
+| **Worker** | Go + FFmpeg | Video processing, HLS generation, Thumbnails |
+| **Frontend** | React + hls.js | User interface and video player |
+| **Database** | PostgreSQL | Persistent storage (users, metadata, feed) |
+| **Storage** | MinIO | S3-compatible object storage for video files |
+| **Search** | Meilisearch | Search engine for news and transcripts |
+| **Metrics** | Prometheus | Monitoring and observability |
 
 ---
 
-## ✨ Funcționalități Cheie (MVP)
+## ✨ Key Features (MVP)
 
 ### 🎥 Streaming & Video
-- **Upload:** Încărcare videoclipuri (Presigned URLs către MinIO).
-- **Procesare:** Transcodare automată în format HLS pentru adaptive streaming.
-- **Playback:** Player custom bazat pe `hls.js`.
-- **Interacțiuni:** Like, Subscribe la creatori.
+- **Upload:** Video uploads using presigned URLs to MinIO.
+- **Processing:** Automatic transcoding to HLS format for adaptive streaming.
+- **Playback:** Custom video player based on `hls.js`.
+- **Interactions:** Likes and subscriptions to content creators.
 
-### 📰 Știri Sportive
-- **Ingestie:** Agregare automată din surse externe (RSS/API).
-- **Personalizare:** Filtrare știri în funcție de sporturile urmărite de utilizator.
-- **Căutare:** Indexare și căutare ultra-rapidă prin articole.
+### 📰 Sports News
+- **Ingestion:** Automatic aggregation from external sources (RSS / APIs).
+- **Personalization:** News filtering based on user-selected sports.
+- **Search:** Ultra-fast article indexing and search.
 
-### 🔐 Utilizatori
-- Autentificare securizată și management profil.
-- Dashboard pentru creatori (gestionare conținut încărcat).
+### 🔐 Users
+- Secure authentication and profile management.
+- Creator dashboard (uploaded content management).
 
 ---
 
-## 👤 Autor
+## 👤 Author
 
 **Damian Alexandru**
 
-*Proiect de Licență - 2025/2026*
+*Bachelor Thesis Project – 2025/2026*
 
 ---
-*Acest proiect este destinat scopurilor educaționale.*
+## 🎯 Roadmap
+
+- **Backend Foundation**
+- ├── ✅ Docker setup
+- ├── ✅ Models & Migrations
+- ├── ⬜ JWT Authentication     
+- ├── ⬜ User CRUD
+- └── ⬜ Basic API structure
+
+- **Video Platform**
+- ├── ⬜ MinIO upload
+- ├── ⬜ FFmpeg processing
+- ├── ⬜ HLS streaming
+- └── ⬜ Video CRUD
+
+- **Content & Discovery**
+- ├── ⬜ RSS news aggregation
+- ├── ⬜ Meilisearch integration
+- ├── ⬜ Subscriptions
+- └── ⬜ Feed algorithm
+
+- **Frontend**
+- ├── ⬜ React setup
+- ├── ⬜ Auth UI
+- ├── ⬜ Video player
+- ├── ⬜ Upload UI
+- └── ⬜ News feed
+
+- **Polish & Deploy**
+- ├── ⬜ Testing
+- ├── ⬜ Documentation
+- ├── ⬜ Deployment (VPS)
+- └── ⬜ Video demo
+
+---
+
+*This project is intended for educational purposes only.*

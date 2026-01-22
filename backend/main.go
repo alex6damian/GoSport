@@ -2,40 +2,25 @@ package main
 
 import (
 	"log"
-	"os"
 
+	"github.com/alex6damian/GoSport/backend/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load env
-	godotenv.Load()
+	// Initialize Database and run migrations
+	database.InitDB()
 
-	app := fiber.New(fiber.Config{
-		AppName: "GoSport API v1.0",
-	})
+	// Fiber setup
+	app := fiber.New()
 
-	// Middleware
-	app.Use(cors.New())
-
-	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"status":  "ok",
-			"service": "gosport-api",
+			"status":   "ok",
+			"database": "connected",
 		})
 	})
 
-	// Routes
-	// api := app.Group("/api/v1")
-
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Fatal(app.Listen(":" + port))
+	log.Println("🚀 Server started on :8080")
+	log.Fatal(app.Listen(":8080"))
 }

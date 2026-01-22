@@ -1,39 +1,71 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
+    container_name: gosport-db
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD:  ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes: 
       - postgres_data:/var/lib/postgresql/data
+    networks: 
+      - gosport-network
 
   minio:
-    image: minio/minio
+    image:  minio/minio
+    container_name: gosport-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD:  ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports: 
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
     volumes:
       - minio_data:/data
+    networks:
+      - gosport-network
 
   meilisearch:
     image:  getmeili/meilisearch:latest
-    environment:
+    container_name: gosport-search
+    environment: 
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
     ports:
-      - "7700:7700"
-    volumes: 
+      - "${MEILI_PORT}:7700"
+    volumes:  
       - meili_data:/meili_data
+    networks:
+      - gosport-network
+
+  backend: 
+    build: ./backend
+    container_name: gosport-api
+    depends_on:
+      - postgres
+      - minio
+      - meilisearch
+    environment: 
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      SALT_KEY: ${SALT_KEY}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY:  ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MEILI_URL:  http://meilisearch:7700
+      MEILI_KEY: ${MEILI_MASTER_KEY}
+    ports:
+      - "${BACKEND_PORT}:8080"
+    networks:
+      - gosport-network
 
 volumes:
-  postgres_data:
+  postgres_data: 
   minio_data:
-  meili_data: 
+  meili_data:  
+
+networks:
+  gosport-network:
+    driver: bridge
