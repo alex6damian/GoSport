@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -19,7 +20,7 @@ func main() {
 
 	// Fiber setup
 	app := fiber.New(fiber.Config{
-		AppName: "GoSport API",
+		AppName: "GoSport API v1",
 	})
 
 	// Global middleware
@@ -41,14 +42,19 @@ func main() {
 	setupRoutes(app)
 
 	port := os.Getenv("BACKEND_PORT")
+	if port == "" {
+		port = "8080"
+		fmt.Println("BACKEND_PORT not set, defaulting to 8080")
+	}
 
+	// Start server
 	log.Println("🚀 Server started on :" + port)
 	log.Fatal(app.Listen(":" + port))
 }
 
 func setupRoutes(app *fiber.App) {
 	// API group
-	api := app.Group("/api")
+	api := app.Group("/api/v1")
 
 	// Auth routes
 	auth := api.Group("/auth")

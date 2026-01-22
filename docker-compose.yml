@@ -12,6 +12,12 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks: 
       - gosport-network
+    restart: unless-stopped
+    healthcheck:                              
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   minio:
     image:  minio/minio
@@ -44,9 +50,8 @@ services:
     build: ./backend
     container_name: gosport-api
     depends_on:
-      - postgres
-      - minio
-      - meilisearch
+      postgres:
+        condition: service_healthy
     environment: 
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
@@ -57,7 +62,7 @@ services:
       MEILI_URL:  http://meilisearch:7700
       MEILI_KEY: ${MEILI_MASTER_KEY}
     ports:
-      - "${BACKEND_PORT}:8080"
+      - "8080:8080"
     networks:
       - gosport-network
 

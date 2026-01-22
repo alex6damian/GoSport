@@ -13,7 +13,7 @@ type RegisterRequest struct {
 	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8"`
-	Role     string `json:"role" validate:"required,oneof=user creator"`
+	Role     string `json:"role" validate:"required,oneof=viewer creator"`
 }
 
 // LoginRequest represents the expected payload for user login
@@ -38,7 +38,7 @@ type UserResponse struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// Register handler - POST /api/auth/register
+// Register handler - POST /api/v1/auth/register
 func Register(c *fiber.Ctx) error {
 	var req RegisterRequest
 
@@ -63,7 +63,7 @@ func Register(c *fiber.Ctx) error {
 
 	// Set default role
 	if req.Role == "" {
-		req.Role = "user"
+		req.Role = "viewer"
 	}
 
 	// Check if exists
@@ -116,7 +116,7 @@ func Register(c *fiber.Ctx) error {
 	})
 }
 
-// Login handler - POST /api/auth/login
+// Login handler - POST /api/v1/auth/login
 func Login(c *fiber.Ctx) error {
 	var req LoginRequest
 
