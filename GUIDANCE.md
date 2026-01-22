@@ -15,7 +15,7 @@ backend/
 │   ├── user.go                # 👤 User Model (id, username, email, password, role)
 │   ├── video.go               # 🎥 Video Model (title, minio_key, hls_path, status, views, comments)
 |   ├── comment.go             # 💬 Comment Model(user, video, content)
-│   ├── news.go                # 📰 NewsArticle Model (title, content, sport, source)
+│   ├── newsarticle.go         # 📰 NewsArticle Model (title, content, sport, source)
 │   └── subscription.go        # 🔔 Subscription Model (subscriber_id, creator_id)
 │
 ├── routes/                    # 🛣️ HTTP handlers (business logic for endpoints)
