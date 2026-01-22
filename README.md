@@ -71,36 +71,36 @@ The system is built using a modular monolithic architecture (with the possibilit
 ## 🎯 Roadmap
 
 - **Backend Foundation**
-- ├── ✅ Docker setup
-- ├── ✅ Models & Migrations
-- ├── ⬜ JWT Authentication     
-- ├── ⬜ User CRUD
-- └── ⬜ Basic API structure
+- ✅ Docker setup
+- ✅ Models & Migrations
+- ⬜ JWT Authentication     
+- ⬜ User CRUD
+- ⬜ Basic API structure
 
 - **Video Platform**
-- ├── ⬜ MinIO upload
-- ├── ⬜ FFmpeg processing
-- ├── ⬜ HLS streaming
-- └── ⬜ Video CRUD
+- ⬜ MinIO upload
+- ⬜ FFmpeg processing
+- ⬜ HLS streaming
+- ⬜ Video CRUD
 
 - **Content & Discovery**
-- ├── ⬜ RSS news aggregation
-- ├── ⬜ Meilisearch integration
-- ├── ⬜ Subscriptions
-- └── ⬜ Feed algorithm
+- ⬜ RSS news aggregation
+- ⬜ Meilisearch integration
+- ⬜ Subscriptions
+- ⬜ Feed algorithm
 
 - **Frontend**
-- ├── ⬜ React setup
-- ├── ⬜ Auth UI
-- ├── ⬜ Video player
-- ├── ⬜ Upload UI
-- └── ⬜ News feed
+- ⬜ React setup
+- ⬜ Auth UI
+- ⬜ Video player
+- ⬜ Upload UI
+- ⬜ News feed
 
 - **Polish & Deploy**
-- ├── ⬜ Testing
-- ├── ⬜ Documentation
-- ├── ⬜ Deployment (VPS)
-- └── ⬜ Video demo
+- ⬜ Testing
+- ⬜ Documentation
+- ⬜ Deployment (VPS)
+- ⬜ Video demo
 
 ---
 
