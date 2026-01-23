@@ -1,6 +1,6 @@
 # 🏟️ GoSport (Bachelor Thesis Project)
 
-![Go](https://img.shields.io/badge/Backend-Go-00ADD8?style=flat&logo=go)
+![Fiber](https://img.shields.io/badge/Backend-Go-00ADD8?style=flat&logo=go)
 ![React](https://img.shields.io/badge/Frontend-React-61DAFB?style=flat&logo=react)
 ![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?style=flat&logo=postgresql)
 ![MinIO](https://img.shields.io/badge/Storage-MinIO-C72C48?style=flat&logo=minio)

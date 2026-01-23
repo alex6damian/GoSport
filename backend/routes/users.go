@@ -13,7 +13,7 @@ import (
 
 // Profile update structure
 type UpdateProfileRequest struct {
-	Username string `json:"username" validate:"omitempty,alphanum,min=3,max=30"`
+	Username string `json:"username" validate:"omitempty,username_pattern,min=3,max=30"`
 	Avatar   string `json:"avatar" validate:"omitempty,url"`
 }
 
