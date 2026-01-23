@@ -19,6 +19,7 @@ backend/
 │   └── subscription.go        # 🔔 Subscription Model (subscriber_id, creator_id)
 │
 ├── routes/                    # 🛣️ HTTP handlers (business logic for endpoints)
+|   ├── user.go                # 👤 User CRUD handlers (GET/PUT /users/me, users/:username, users/:username/videos)
 │   └── auth.go                # 🔐 Register & Login handlers (POST /auth/register, /auth/login)
 │
 ├── middleware/                # 🛡️ HTTP middleware (functions that run before handlers)
@@ -62,6 +63,7 @@ Go structs that map to database tables:
 ### 🛣️ Routes
 Controllers for API endpoints:
 - **auth.go** - Authentication (register, login)
+- **users.go** - User CRUD (view/edit profile, check videos/profiles)
 
 ### 🛡️ Middleware
 Intermediate functions for request processing:
@@ -72,7 +74,7 @@ Reusable helper functions:
 - **hash.go** - Secure password hashing (bcrypt)
 - **jwt.go** - JWT token generation and validation
 - **response.go** - Uniform API response formatting
-- **validator.go** - Input validation (email, password, etc.)
+- **validator.go** - Input validation (username, password, etc.)
 
 ---
 

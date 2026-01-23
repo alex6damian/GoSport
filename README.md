@@ -74,7 +74,7 @@ The system is built using a modular monolithic architecture (with the possibilit
 - ✅ Docker setup
 - ✅ Models & Migrations
 - ✅ JWT Authentication     
-- ⬜ User CRUD
+- ✅ User CRUD
 - ⬜ Basic API structure
 
 - ### Video Platform
