@@ -61,22 +61,11 @@ func setupRoutes(app *fiber.App) {
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
 
-	// Protected route example
-	api.Get("/profile", middleware.AuthMiddleWare, func(c *fiber.Ctx) error {
-		userID := c.Locals("userID").(uint)
-		userEmail := c.Locals("userEmail").(string)
+	// User routes
+	users := api.Group("/users") // /api/v1/users
+	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile)
+	users.Put("/me", middleware.AuthMiddleWare, routes.UpdateMyProfile)
+	users.Get("/:username", routes.GetUserProfileByUsername)
+	users.Get("/:username/videos", routes.GetUserVideosByUsername)
 
-		return c.JSON(fiber.Map{
-			"user_id":    userID,
-			"user_email": userEmail,
-		})
-	})
-
-	// Creator-only route example
-	api.Post("/videos/upload",
-		middleware.AuthMiddleWare, middleware.RequireRole("creator"),
-		func(c *fiber.Ctx) error {
-			return c.SendString("Upload video (creator only)")
-		},
-	)
 }

@@ -10,10 +10,10 @@ import (
 
 // RegisterRequest represents the expected payload for user registration
 type RegisterRequest struct {
-	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`
+	Username string `json:"username" validate:"required,min=3,max=30,username_pattern"`
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8"`
-	Role     string `json:"role" validate:"required,oneof=viewer creator"`
+	Password string `json:"password" validate:"required,min=8,strong_password"`
+	Role     string `json:"role" validate:"omitempty,oneof=user admin"`
 }
 
 // LoginRequest represents the expected payload for user login
@@ -47,23 +47,20 @@ func Register(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
 	}
 
+	// All validation in one call
 	if err := utils.ValidateStruct(req); err != nil {
-		// convert validation error to a map[string]string expected by ValidationErrorResponse
+		// Convert validation error to a map[string]string expected by ValidationErrorResponse
 		return utils.ValidationErrorResponse(c, map[string]string{"error": err.Error()})
-	}
-
-	// Custom validations
-	if !utils.IsValidEmail(req.Email) {
-		return utils.ErrorResponse(c, "Invalid email format", fiber.StatusBadRequest)
-	}
-
-	if !utils.IsStrongPassword(req.Password) {
-		return utils.ErrorResponse(c, "Password must be at least 8 characters long, contain an uppercase letter and a number", fiber.StatusBadRequest)
 	}
 
 	// Set default role
 	if req.Role == "" {
-		req.Role = "viewer"
+		req.Role = "user"
+	}
+
+	// Prevent creating admin users through registration
+	if req.Role == "admin" {
+		return utils.ErrorResponse(c, "Cannot create admin users through registration", fiber.StatusForbidden)
 	}
 
 	// Check if exists
