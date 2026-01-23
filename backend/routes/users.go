@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"strconv"
+
 	"github.com/alex6damian/GoSport/backend/database"
 	"github.com/alex6damian/GoSport/backend/models"
 	"github.com/alex6damian/GoSport/backend/utils"
@@ -118,4 +120,101 @@ func UpdateMyProfile(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, response)
+}
+
+// GET /api/v1/users/:username -> Get user profile by username
+func GetUserProfileByUsername(c *fiber.Ctx) error {
+	username := c.Params("username")
+
+	if username == "" {
+		return utils.ErrorResponse(c, "Username is required", fiber.StatusBadRequest)
+	}
+
+	var user models.User
+	var err error
+
+	if err = database.DB.Where("username = ?", username).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return utils.ErrorResponse(c, "User not found", fiber.StatusNotFound)
+		}
+		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
+	}
+
+	// Count videos and subscribers
+	var videosCount, subscribersCount int64
+	database.DB.Model(&models.Video{}).Where("user_id = ?", user.ID).Count(&videosCount)
+	database.DB.Model(&models.Subscription{}).Where("creator_id = ?", user.ID).Count(&subscribersCount)
+
+	// Public profile
+	response := UserProfileResponse{
+		Username:         user.Username,
+		Avatar:           user.Avatar,
+		VideosCount:      videosCount,
+		SubscribersCount: subscribersCount,
+		CreatedAt:        user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	return utils.SuccessResponse(c, response)
+}
+
+// GET /api/v1/users/:username/videos -> Get videos uploaded by a user
+func GetUserVideosByUsername(c *fiber.Ctx) error {
+	username := c.Params("username")
+
+	if username == "" {
+		return utils.ErrorResponse(c, "Username is required", fiber.StatusBadRequest)
+	}
+
+	// Find user by username
+	var user models.User
+	if err := database.DB.Where("username = ?", username).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return utils.ErrorResponse(c, "User not found", fiber.StatusNotFound)
+		}
+		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
+	}
+
+	// Paginate videos
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 20 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	// Get videos
+	var videos []models.Video
+	var videosCount int64
+
+	database.DB.Model(&models.Video{}).Where("user_id = ?", user.ID).Count(&videosCount)
+
+	if err := database.DB.
+		Where("user_id = ? AND status = ?", user.ID, "ready").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&videos).Error; err != nil {
+		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
+	}
+
+	// Return response
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"user": fiber.Map{
+				"username": user.Username,
+				"avatar":   user.Avatar,
+			},
+			"videos": videos,
+			"pagination": fiber.Map{
+				"page":        page,
+				"limit":       limit,
+				"videosCount": videosCount,
+				"pages":       (videosCount + int64(limit) - 1) / int64(limit),
+			},
+		},
+	})
 }
