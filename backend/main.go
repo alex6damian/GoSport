@@ -72,11 +72,4 @@ func setupRoutes(app *fiber.App) {
 		})
 	})
 
-	// Creator-only route example
-	api.Post("/videos/upload",
-		middleware.AuthMiddleWare, middleware.RequireRole("creator"),
-		func(c *fiber.Ctx) error {
-			return c.SendString("Upload video (creator only)")
-		},
-	)
 }

@@ -47,18 +47,24 @@ func AuthMiddleWare(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-func RequireRole(role string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		userRole := c.Locals("userRole").(string)
+func RequireAdmin(c *fiber.Ctx) error {
+	userRole := c.Locals("userRole")
 
-		if userRole != role {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"success": false,
-				"error":   "Insufficient permissions",
-			})
-		}
-
-		// Proceed to next handler
-		return c.Next()
+	// Check if userRole exists and is string
+	if userRole == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"error":   "Unauthorized",
+		})
 	}
+
+	role, ok := userRole.(string)
+	if !ok || role != "admin" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"success": false,
+			"error":   "Admin access required",
+		})
+	}
+
+	return c.Next()
 }

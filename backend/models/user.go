@@ -12,7 +12,7 @@ type User struct {
 	Email     string         `gorm:"unique;not null" json:"email"`
 	Password  string         `gorm:"not null" json:"-"`              // hashed password, exclude from JSON responses
 	Verified  bool           `gorm:"default: false" json:"verified"` // email verified
-	Role      string         `gorm:"default: viewer" json:"role"`    // viewer, creator
+	Role      string         `gorm:"default: user" json:"role"`      // viewer, creator
 	Avatar    string         `json:"avatar"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

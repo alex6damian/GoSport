@@ -13,7 +13,7 @@ type RegisterRequest struct {
 	Username string `json:"username" validate:"required,alphanum,min=3,max=30"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8"`
-	Role     string `json:"role" validate:"required,oneof=viewer creator"`
+	Role     string `json:"role" validate:"required,oneof=user admin"`
 }
 
 // LoginRequest represents the expected payload for user login
@@ -63,7 +63,12 @@ func Register(c *fiber.Ctx) error {
 
 	// Set default role
 	if req.Role == "" {
-		req.Role = "viewer"
+		req.Role = "user"
+	}
+
+	// Prevent creating admin users through registration
+	if req.Role == "admin" {
+		return utils.ErrorResponse(c, "Cannot create admin users through registration", fiber.StatusForbidden)
 	}
 
 	// Check if exists
