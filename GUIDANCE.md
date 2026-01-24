@@ -37,10 +37,12 @@ backend/
     ├── jwt.go                 # 🎫 JWT token generation & validation
     │                          #     - GenerateToken()
     │                          #     - ValidateToken()
-    ├──pagination.go           # 📄 Pagination helper
+    ├── pagination.go          # 📄 Pagination helper
     │                          #     - ParsePagination()
     │                          #     - CreatePaginationMeta()
     │                          #     - PaginatedResponse()
+    ├── query.go               # 🔍 Query parsing utilities
+    |
     ├── response.go            # 📤 Standardized API responses
     │                          #     - SuccessResponse()
     │                          #     - ErrorResponse()

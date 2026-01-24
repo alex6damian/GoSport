@@ -8,7 +8,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	recovermw "github.com/gofiber/fiber/v2/middleware/recover"
 
+	"github.com/alex6damian/GoSport/backend/config"
 	"github.com/alex6damian/GoSport/backend/database"
 	"github.com/alex6damian/GoSport/backend/middleware"
 	"github.com/alex6damian/GoSport/backend/routes"
@@ -20,26 +22,41 @@ func main() {
 
 	// Fiber setup
 	app := fiber.New(fiber.Config{
-		AppName: "GoSport API v1",
+		AppName:      "GoSport API v1",
+		ErrorHandler: middleware.ErrorHandler,
 	})
 
-	// Global middleware
-	app.Use(logger.New())
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*", // Domain in the future
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+	// Recovery middleware to catch panics
+	app.Use(recovermw.New())
+
+	// Request logging
+	app.Use(logger.New(logger.Config{
+		Format:     "[${time}] ${status} - ${latency} ${method} ${path}\n",
+		TimeFormat: "2006-01-02 15:04:05",
+		TimeZone:   "Local",
 	}))
+
+	// CORS
+	app.Use(cors.New(config.CORSConfig()))
+
+	// Global rate limiter (100 req/min)
+	app.Use(middleware.RateLimiter())
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status":   "ok",
 			"database": "connected",
+			"service":  "gosport-api",
+			"version":  "1.0.0",
 		})
 	})
 
 	// Setup routes
 	setupRoutes(app)
+
+	// 404 Handler
+	app.Use(middleware.NotFoundHandler)
 
 	port := os.Getenv("BACKEND_PORT")
 	if port == "" {
