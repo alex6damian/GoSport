@@ -8,9 +8,17 @@ backend/
 ├── go.mod                     # 📦 Go dependencies (package versions)
 ├── go.sum                     # 🔒 Checksums for dependencies (security)
 │
+├── config/                    # ⛔ Cross-Origin Resource Sharing configuration
+|   └── cors.go                # 📌 Enhanced CORS configuration
+|
 ├── database/
 │   └── db.go                  # 🗄️ PostgreSQL connection + GORM setup + AutoMigrate tables
 │
+├── middleware/                # 🛡️ HTTP middleware (functions that run before handlers)
+|   ├── auth.go                # 🔑 JWT verification (validates token in Authorization header)
+│   ├── error_handler.go       # ⚠️ Unexpected server errors handler
+│   └── rate_limiter.go        # ✋ Brute-force protection
+|
 ├── models/                    # 📊 Database models (Go structs = SQL tables)
 │   ├── user.go                # 👤 User Model (id, username, email, password, role)
 │   ├── video.go               # 🎥 Video Model (title, minio_key, hls_path, status, views, comments)
@@ -22,9 +30,6 @@ backend/
 |   ├── user.go                # 👤 User CRUD handlers (GET/PUT /users/me, users/:username, users/:username/videos)
 │   └── auth.go                # 🔐 Register & Login handlers (POST /auth/register, /auth/login)
 │
-├── middleware/                # 🛡️ HTTP middleware (functions that run before handlers)
-│   └── auth.go                # 🔑 JWT verification (validates token in Authorization header)
-│
 └── utils/                     # 🧰 Helper functions (reusable utilities)
     ├── hash.go                # 🔒 Password hashing (bcrypt)
     │                          #     - HashPassword()
@@ -32,6 +37,12 @@ backend/
     ├── jwt.go                 # 🎫 JWT token generation & validation
     │                          #     - GenerateToken()
     │                          #     - ValidateToken()
+    ├── pagination.go          # 📄 Pagination helper
+    │                          #     - ParsePagination()
+    │                          #     - CreatePaginationMeta()
+    │                          #     - PaginatedResponse()
+    ├── query.go               # 🔍 Query parsing utilities
+    |
     ├── response.go            # 📤 Standardized API responses
     │                          #     - SuccessResponse()
     │                          #     - ErrorResponse()

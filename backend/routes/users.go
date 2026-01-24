@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"strconv"
-
 	"github.com/alex6damian/GoSport/backend/database"
 	"github.com/alex6damian/GoSport/backend/models"
 	"github.com/alex6damian/GoSport/backend/utils"
@@ -174,47 +172,43 @@ func GetUserVideosByUsername(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
 	}
 
-	// Paginate videos
-	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 20 {
-		limit = 20
-	}
-	offset := (page - 1) * limit
+	// Parse pagination
+	pagination := utils.ParsePagination(c)
+
+	// Parse query filters
+	filters := utils.ParseQueryFilters(c, "created_at")
+
+	// Validate sort field
+	allowedSortFields := []string{"created_at", "views", "title"}
+	sortBy := utils.ValidateSortField(filters.SortBy, allowedSortFields)
+
+	// Get videos count
+	var videosCount int64
+	database.DB.Model(&models.Video{}).Where("user_id = ?", user.ID).Count(&videosCount)
 
 	// Get videos
 	var videos []models.Video
-	var videosCount int64
-
-	database.DB.Model(&models.Video{}).Where("user_id = ?", user.ID).Count(&videosCount)
+	orderClause := utils.BuildOrderClause(sortBy, filters.Order)
 
 	if err := database.DB.
 		Where("user_id = ? AND status = ?", user.ID, "ready").
-		Order("created_at DESC").
-		Limit(limit).
-		Offset(offset).
+		Order(orderClause).
+		Limit(pagination.Limit).
+		Offset(pagination.Offset).
 		Find(&videos).Error; err != nil {
 		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
 	}
 
+	// Create pagination metadata
+	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, videosCount)
+
 	// Return response
-	return c.JSON(fiber.Map{
-		"success": true,
-		"data": fiber.Map{
-			"user": fiber.Map{
-				"username": user.Username,
-				"avatar":   user.Avatar,
-			},
-			"videos": videos,
-			"pagination": fiber.Map{
-				"page":        page,
-				"limit":       limit,
-				"videosCount": videosCount,
-				"pages":       (videosCount + int64(limit) - 1) / int64(limit),
-			},
+	return utils.PaginatedResponse(c, fiber.Map{
+		"user": fiber.Map{
+			"id":       user.ID,
+			"username": user.Username,
+			"avatar":   user.Avatar,
 		},
-	})
+		"videos": videos,
+	}, paginationMeta)
 }
