@@ -26,7 +26,7 @@ type PaginationMeta struct {
 // Extracts and validates pagination parameters from query
 func ParsePagination(c *fiber.Ctx) PaginationParams {
 	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 10)
+	limit := c.QueryInt("limit", 20)
 
 	// Validate page
 	if page < 1 {

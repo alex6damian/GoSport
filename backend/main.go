@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	recovermw "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 
 	"github.com/alex6damian/GoSport/backend/config"
 	"github.com/alex6damian/GoSport/backend/database"
@@ -27,7 +27,7 @@ func main() {
 	})
 
 	// Recovery middleware to catch panics
-	app.Use(recovermw.New())
+	app.Use(recover.New())
 
 	// Request logging
 	app.Use(logger.New(logger.Config{
@@ -74,7 +74,7 @@ func setupRoutes(app *fiber.App) {
 	api := app.Group("/api/v1")
 
 	// Auth routes
-	auth := api.Group("/auth")
+	auth := api.Group("/auth", middleware.AuthRateLimiter()) // /api/v1/auth
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
 

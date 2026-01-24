@@ -31,8 +31,8 @@ func RateLimiter() fiber.Handler {
 // Rate limiter for auth endpoints (preventing brute-force attacks)
 func AuthRateLimiter() fiber.Handler {
 	return limiter.New(limiter.Config{
-		Max:        5,               // Only 5 attempts
-		Expiration: 5 * time.Minute, // Per 5 minutes
+		Max:        5,                // Only 5 attempts
+		Expiration: 15 * time.Minute, // Per 15 minutes
 		KeyGenerator: func(c *fiber.Ctx) string {
 			// Use client IP as the key to identify the requests
 			return c.IP()
@@ -40,7 +40,7 @@ func AuthRateLimiter() fiber.Handler {
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"success": false,
-				"error":   "Too many login attempts. Please try again in 5 minutes.",
+				"error":   "Too many login attempts. Please try again in 15 minutes.",
 			})
 		},
 	})
