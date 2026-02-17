@@ -14,8 +14,9 @@ var MinioClient *minio.Client
 // Initialize MinIO client and creates bucket if needed
 func InitMinio() error {
 	endpoint := os.Getenv("MINIO_ENDPOINT")
-	accessKey := os.Getenv("MINIO_ROOT_USER")
-	secretKey := os.Getenv("MINIO_ROOT_PASSWORD")
+	accessKey := os.Getenv("MINIO_ACCESS_KEY")
+	secretKey := os.Getenv("MINIO_SECRET_KEY")
+
 	// SSL = Secure Socket Layer(HTTPS encryption), false for development, true for production with HTTPS
 	useSSL := os.Getenv("MINIO_USE_SSL") == "true"
 

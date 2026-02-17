@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -22,7 +21,8 @@ func main() {
 
 	// Initialize MinIO client and bucket
 	if err := config.InitMinio(); err != nil {
-		log.Fatalf("Failed to initialize MinIO: %v", err)
+		log.Printf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
+		log.Println("⚠️  Video upload will NOT work, but API will continue...")
 	}
 
 	// Fiber setup
@@ -65,10 +65,6 @@ func main() {
 	app.Use(middleware.NotFoundHandler)
 
 	port := os.Getenv("BACKEND_PORT")
-	if port == "" {
-		port = "8080"
-		fmt.Println("BACKEND_PORT not set, defaulting to 8080")
-	}
 
 	// Start server
 	log.Println("🚀 Server started on :" + port)
