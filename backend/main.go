@@ -79,8 +79,8 @@ func setupRoutes(app *fiber.App) {
 	auth.Post("/login", routes.Login)
 
 	// User routes
-	users := api.Group("/users") // /api/v1/users
-	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile)
+	users := api.Group("/users")                                     // /api/v1/users
+	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile) // Middleware acts first as authentication gate
 	users.Put("/me", middleware.AuthMiddleWare, routes.UpdateMyProfile)
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideosByUsername)
