@@ -20,10 +20,16 @@ func main() {
 	// Initialize Database and run migrations
 	database.InitDB()
 
+	// Initialize MinIO client and bucket
+	if err := config.InitMinio(); err != nil {
+		log.Fatalf("Failed to initialize MinIO: %v", err)
+	}
+
 	// Fiber setup
 	app := fiber.New(fiber.Config{
 		AppName:      "GoSport API v1",
 		ErrorHandler: middleware.ErrorHandler,
+		BodyLimit:    100 * 1024 * 1024, // 100 MB max upload
 	})
 
 	// Recovery middleware to catch panics
@@ -85,4 +91,9 @@ func setupRoutes(app *fiber.App) {
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideosByUsername)
 
+	// Video routes
+	// videos := api.Group("/videos")
+	// videos.Post("/upload", middleware.AuthMiddleWare, routes.UploadVideo)
+	// videos.Get("/:id", routes.GetVideo)
+	// videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
 }
