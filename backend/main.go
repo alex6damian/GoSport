@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -20,10 +19,17 @@ func main() {
 	// Initialize Database and run migrations
 	database.InitDB()
 
+	// Initialize MinIO client and bucket
+	if err := config.InitMinio(); err != nil {
+		log.Printf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
+		log.Println("⚠️  Video upload will NOT work, but API will continue...")
+	}
+
 	// Fiber setup
 	app := fiber.New(fiber.Config{
 		AppName:      "GoSport API v1",
 		ErrorHandler: middleware.ErrorHandler,
+		BodyLimit:    100 * 1024 * 1024, // 100 MB max upload
 	})
 
 	// Recovery middleware to catch panics
@@ -59,10 +65,6 @@ func main() {
 	app.Use(middleware.NotFoundHandler)
 
 	port := os.Getenv("BACKEND_PORT")
-	if port == "" {
-		port = "8080"
-		fmt.Println("BACKEND_PORT not set, defaulting to 8080")
-	}
 
 	// Start server
 	log.Println("🚀 Server started on :" + port)
@@ -79,10 +81,17 @@ func setupRoutes(app *fiber.App) {
 	auth.Post("/login", routes.Login)
 
 	// User routes
-	users := api.Group("/users") // /api/v1/users
-	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile)
+	users := api.Group("/users")                                     // /api/v1/users
+	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile) // Middleware acts first as authentication gate
 	users.Put("/me", middleware.AuthMiddleWare, routes.UpdateMyProfile)
 	users.Get("/:username", routes.GetUserProfileByUsername)
-	users.Get("/:username/videos", routes.GetUserVideosByUsername)
+	users.Get("/:username/videos", routes.GetUserVideos)
 
+	// Video routes
+	videos := api.Group("/videos")
+	videos.Post("/upload", middleware.AuthMiddleWare, routes.UploadVideo)
+	videos.Get("/", routes.ListVideos)
+	videos.Get("/:id", routes.GetVideo)
+	videos.Put("/:id", middleware.AuthMiddleWare, routes.UpdateVideo)
+	videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
 }
