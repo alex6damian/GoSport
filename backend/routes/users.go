@@ -155,60 +155,38 @@ func GetUserProfileByUsername(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, response)
 }
 
-// GET /api/v1/users/:username/videos -> Get videos uploaded by a user
-func GetUserVideosByUsername(c *fiber.Ctx) error {
+// GetUserVideos gets all videos by a specific user - GET /api/v1/users/:username/videos
+func GetUserVideos(c *fiber.Ctx) error {
 	username := c.Params("username")
 
-	if username == "" {
-		return utils.ErrorResponse(c, "Username is required", fiber.StatusBadRequest)
-	}
-
-	// Find user by username
+	// Find user
 	var user models.User
 	if err := database.DB.Where("username = ?", username).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return utils.ErrorResponse(c, "User not found", fiber.StatusNotFound)
-		}
-		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
+		return utils.ErrorResponse(c, "User not found", fiber.StatusNotFound)
 	}
 
 	// Parse pagination
 	pagination := utils.ParsePagination(c)
 
-	// Parse query filters
-	filters := utils.ParseQueryFilters(c, "created_at")
-
-	// Validate sort field
-	allowedSortFields := []string{"created_at", "views", "title"}
-	sortBy := utils.ValidateSortField(filters.SortBy, allowedSortFields)
-
-	// Get videos count
-	var videosCount int64
-	database.DB.Model(&models.Video{}).Where("user_id = ?", user.ID).Count(&videosCount)
+	// Get total count
+	var total int64
+	database.DB.Model(&models.Video{}).Where("user_id = ? AND status = ?", user.ID, "ready").Count(&total)
 
 	// Get videos
 	var videos []models.Video
-	orderClause := utils.BuildOrderClause(sortBy, filters.Order)
-
 	if err := database.DB.
 		Where("user_id = ? AND status = ?", user.ID, "ready").
-		Order(orderClause).
+		Order("created_at DESC").
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Find(&videos).Error; err != nil {
-		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
+		return utils.ErrorResponse(c, "Failed to fetch videos", fiber.StatusInternalServerError)
 	}
 
 	// Create pagination metadata
-	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, videosCount)
+	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, total)
 
-	// Return response
 	return utils.PaginatedResponse(c, fiber.Map{
-		"user": fiber.Map{
-			"id":       user.ID,
-			"username": user.Username,
-			"avatar":   user.Avatar,
-		},
 		"videos": videos,
 	}, paginationMeta)
 }

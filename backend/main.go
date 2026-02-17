@@ -85,11 +85,13 @@ func setupRoutes(app *fiber.App) {
 	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile) // Middleware acts first as authentication gate
 	users.Put("/me", middleware.AuthMiddleWare, routes.UpdateMyProfile)
 	users.Get("/:username", routes.GetUserProfileByUsername)
-	users.Get("/:username/videos", routes.GetUserVideosByUsername)
+	users.Get("/:username/videos", routes.GetUserVideos)
 
 	// Video routes
-	// videos := api.Group("/videos")
-	// videos.Post("/upload", middleware.AuthMiddleWare, routes.UploadVideo)
-	// videos.Get("/:id", routes.GetVideo)
-	// videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
+	videos := api.Group("/videos")
+	videos.Post("/upload", middleware.AuthMiddleWare, routes.UploadVideo)
+	videos.Get("/", routes.ListVideos)
+	videos.Get("/:id", routes.GetVideo)
+	videos.Put("/:id", middleware.AuthMiddleWare, routes.UpdateVideo)
+	videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
 }
