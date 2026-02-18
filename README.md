@@ -79,9 +79,9 @@ The system is built using a modular monolithic architecture (with the possibilit
 
 - ### Video Platform
 - ✅ MinIO upload
-- ⬜ FFmpeg processing
-- ⬜ HLS streaming
-- ⬜ Video CRUD
+- ✅ FFmpeg processing
+- ✅ HLS streaming
+- ✅ Video CRUD
 
 - ### Content & Discovery
 - ⬜ RSS news aggregation
