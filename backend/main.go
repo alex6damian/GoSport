@@ -21,8 +21,7 @@ func main() {
 
 	// Initialize MinIO client and bucket
 	if err := config.InitMinio(); err != nil {
-		log.Printf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
-		log.Println("⚠️  Video upload will NOT work, but API will continue...")
+		log.Fatalf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
 	}
 
 	// Fiber setup
