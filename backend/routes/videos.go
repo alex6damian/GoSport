@@ -2,11 +2,13 @@ package routes
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
 	"github.com/alex6damian/GoSport/backend/services"
 	"github.com/alex6damian/GoSport/backend/utils"
@@ -220,17 +222,40 @@ func DeleteVideo(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "You don't have permission to delete this video", fiber.StatusForbidden)
 	}
 
-	// Delete video file from MinIO
-	if video.MinioKey != "" {
-		if err := services.DeleteVideo(video.MinioKey); err != nil {
-			return utils.ErrorResponse(c, "Failed to delete video file", fiber.StatusInternalServerError)
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Delete associated comments first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.Comment{}).Error; err != nil {
+			return err
 		}
+		// Delete associated processing jobs first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.ProcessingJob{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&video).Error; err != nil {
+			return err
+		}
+
+		// if video.Status == "ready" {
+		// 	services.DeleteHLSFolder(video.ID)
+		// }
+
+		return nil
+	})
+
+	if err != nil {
+		// Log the error for debugging purposes, but return a generic message to the client
+		log.Printf("Failed to delete video and associated data: %v", err)
+		return utils.ErrorResponse(c, "Failed to delete video", fiber.StatusInternalServerError)
 	}
 
-	// Delete thumbnail from MinIO if exists
-	if video.Thumbnail != "" {
-		services.DeleteVideo(video.Thumbnail) // Ignore error for thumbnail
-	}
+	go func() {
+		if video.MinioKey != "" {
+			services.DeleteVideo(video.MinioKey)
+		}
+		if video.Thumbnail != "" {
+			services.DeleteVideo(video.Thumbnail)
+		}
+	}()
 
 	// Delete from database (soft delete)
 	if err := database.DB.Delete(&video).Error; err != nil {

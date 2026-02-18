@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -66,4 +67,40 @@ func GetVideoInfo(objectName string) (*minio.ObjectInfo, error) {
 	}
 
 	return &info, nil
+}
+
+func DeleteHLSFolder(videoID uint) error {
+	bucketName := os.Getenv("MINIO_BUCKET_NAME")
+
+	// Construct the object prefix, which represents the folder path in MinIO.
+	// Example: "videos/hls/123/"
+	prefix := fmt.Sprintf("videos/hls/%d/", videoID)
+
+	// List all objects in the bucket that start with this prefix.
+	// The 'Recursive: true' option ensures it finds all files in the "folder".
+	objectsCh := config.MinioClient.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	// Use MinIO's efficient RemoveObjects API for bulk deletion.
+	errorCh := config.MinioClient.RemoveObjects(context.Background(), bucketName, objectsCh, minio.RemoveObjectsOptions{
+		GovernanceBypass: true,
+	})
+
+	// Check for any errors during the bulk deletion process.
+	hasErrors := false
+	for e := range errorCh {
+		if e.Err != nil {
+			hasErrors = true
+			log.Printf("Error deleting object %s: %v", e.ObjectName, e.Err)
+		}
+	}
+
+	if hasErrors {
+		return fmt.Errorf("one or more objects could not be deleted from HLS folder %s", prefix)
+	}
+
+	log.Printf("Successfully initiated deletion for HLS folder: %s", prefix)
+	return nil
 }

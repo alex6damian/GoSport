@@ -50,11 +50,11 @@ func main() {
 		err = processJob(database.DB, job)
 		if err != nil {
 			log.Printf("Failed to process job ID %d: %v", job.ID, err)
-			updateJobStatus(database.DB, job, "failed", err.Error())
-			updateVideoStatus(database.DB, job.VideoID, "failed")
+			UpdateJobStatus(database.DB, job, "failed", err.Error())
+			UpdateVideoStatus(database.DB, job.VideoID, "failed")
 		} else {
 			log.Printf("Successfully processed job ID %d", job.ID)
-			updateJobStatus(database.DB, job, "completed", "")
+			UpdateJobStatus(database.DB, job, "completed", "")
 			// Video status is updated in processJob
 		}
 	}
@@ -91,7 +91,6 @@ func findAndLockJob(db *gorm.DB) (*models.ProcessingJob, error) {
 func processJob(db *gorm.DB, job *models.ProcessingJob) error {
 	log.Printf("Starting processing for job ID %d...", job.ID)
 
-	// START
 	// Getting video details from DB (MinioKey)
 	var video models.Video
 	if err := db.First(&video, job.VideoID).Error; err != nil {
@@ -175,10 +174,10 @@ func processJob(db *gorm.DB, job *models.ProcessingJob) error {
 
 	// Update video to "ready" status and set HLS path to the master playlist URL
 	finalHLSPath := hlsRemotePath + hlsMasterPlaylist // e.g., videos/hls/123/master.m3u8
-	return updateVideoSuccess(db, job.VideoID, finalHLSPath)
+	return UpdateVideoSuccess(db, job.VideoID, finalHLSPath)
 }
 
-func updateVideoSuccess(db *gorm.DB, videoID uint, hlsPath string) error {
+func UpdateVideoSuccess(db *gorm.DB, videoID uint, hlsPath string) error {
 	return db.Model(&models.Video{}).
 		Where("id = ?", videoID).
 		Updates(models.Video{
@@ -188,13 +187,13 @@ func updateVideoSuccess(db *gorm.DB, videoID uint, hlsPath string) error {
 }
 
 // Update job status and logs
-func updateJobStatus(db *gorm.DB, job *models.ProcessingJob, status string, logs string) {
+func UpdateJobStatus(db *gorm.DB, job *models.ProcessingJob, status string, logs string) {
 	job.Status = status
 	job.Logs = logs
 	db.Save(job)
 }
 
 // Update video status
-func updateVideoStatus(db *gorm.DB, videoID uint, status string) {
+func UpdateVideoStatus(db *gorm.DB, videoID uint, status string) {
 	db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", status)
 }
