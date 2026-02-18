@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/alex6damian/GoSport/backend/config"
+	"github.com/alex6damian/GoSport/pkg/config"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 )

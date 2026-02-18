@@ -8,10 +8,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/alex6damian/GoSport/backend/database"
-	"github.com/alex6damian/GoSport/backend/models"
 	"github.com/alex6damian/GoSport/backend/services"
 	"github.com/alex6damian/GoSport/backend/utils"
+	"github.com/alex6damian/GoSport/pkg/database"
+	"github.com/alex6damian/GoSport/pkg/models"
 )
 
 // Allowed video formats
@@ -89,13 +89,26 @@ func UploadVideo(c *fiber.Ctx) error {
 		FileName:    file.Filename,
 		FileSize:    file.Size,
 		MimeType:    file.Header.Get("Content-Type"),
-		Status:      "ready", // "ready" for simplicity, in real app this would be "pending" and a background worker would process it
+		Status:      "pending", // "ready" for simplicity, in real app this would be "pending" and a background worker would process it
 	}
 
 	if err := database.DB.Create(&video).Error; err != nil {
 		// Cleanup: delete from MinIO if DB insert fails
 		services.DeleteVideo(minioKey)
 		return utils.ErrorResponse(c, "Failed to save video", fiber.StatusInternalServerError)
+	}
+
+	// Create processing job
+	processingJob := models.ProcessingJob{
+		VideoID: video.ID,
+		Status:  "queued",
+	}
+
+	if err := database.DB.Create(&processingJob).Error; err != nil {
+		// Cleanup: delete video record and MinIO file if job creation fails
+		database.DB.Delete(&video)
+		services.DeleteVideo(minioKey)
+		return utils.ErrorResponse(c, "Failed to create processing job", fiber.StatusInternalServerError)
 	}
 
 	// Load user info
@@ -106,6 +119,59 @@ func UploadVideo(c *fiber.Ctx) error {
 		"message": "Video uploaded successfully",
 		"data":    video,
 	})
+}
+
+// ListVideos lists all videos with pagination and filters - GET /api/v1/videos
+func ListVideos(c *fiber.Ctx) error {
+	// Parse pagination
+	pagination := utils.ParsePagination(c)
+
+	// Parse filters
+	filters := utils.ParseQueryFilters(c, "created_at")
+
+	// Get sport filter
+	sport := c.Query("sport")
+
+	// Build query
+	query := database.DB.Model(&models.Video{}).Where("status = ?", "ready")
+
+	// Apply sport filter
+	if sport != "" {
+		query = query.Where("sport = ?", sport)
+	}
+
+	// Apply search filter
+	if filters.Search != "" {
+		query = query.Where("title ILIKE ? OR description ILIKE ?",
+			"%"+filters.Search+"%",
+			"%"+filters.Search+"%")
+	}
+
+	// Get total count
+	var total int64
+	query.Count(&total)
+
+	// Get videos
+	var videos []models.Video
+	allowedSortFields := []string{"created_at", "views", "likes", "title"}
+	sortBy := utils.ValidateSortField(filters.SortBy, allowedSortFields)
+	orderClause := utils.BuildOrderClause(sortBy, filters.Order)
+
+	if err := query.
+		Preload("User").
+		Order(orderClause).
+		Limit(pagination.Limit).
+		Offset(pagination.Offset).
+		Find(&videos).Error; err != nil {
+		return utils.ErrorResponse(c, "Failed to fetch videos", fiber.StatusInternalServerError)
+	}
+
+	// Create pagination metadata
+	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, total)
+
+	return utils.PaginatedResponse(c, fiber.Map{
+		"videos": videos,
+	}, paginationMeta)
 }
 
 // GetVideo retrieves video details with presigned URL - GET /api/v1/videos/:id
@@ -174,59 +240,6 @@ func DeleteVideo(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, fiber.Map{
 		"message": "Video deleted successfully",
 	})
-}
-
-// ListVideos lists all videos with pagination and filters - GET /api/v1/videos
-func ListVideos(c *fiber.Ctx) error {
-	// Parse pagination
-	pagination := utils.ParsePagination(c)
-
-	// Parse filters
-	filters := utils.ParseQueryFilters(c, "created_at")
-
-	// Get sport filter
-	sport := c.Query("sport")
-
-	// Build query
-	query := database.DB.Model(&models.Video{}).Where("status = ?", "ready")
-
-	// Apply sport filter
-	if sport != "" {
-		query = query.Where("sport = ?", sport)
-	}
-
-	// Apply search filter
-	if filters.Search != "" {
-		query = query.Where("title ILIKE ? OR description ILIKE ?",
-			"%"+filters.Search+"%",
-			"%"+filters.Search+"%")
-	}
-
-	// Get total count
-	var total int64
-	query.Count(&total)
-
-	// Get videos
-	var videos []models.Video
-	allowedSortFields := []string{"created_at", "views", "likes", "title"}
-	sortBy := utils.ValidateSortField(filters.SortBy, allowedSortFields)
-	orderClause := utils.BuildOrderClause(sortBy, filters.Order)
-
-	if err := query.
-		Preload("User").
-		Order(orderClause).
-		Limit(pagination.Limit).
-		Offset(pagination.Offset).
-		Find(&videos).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to fetch videos", fiber.StatusInternalServerError)
-	}
-
-	// Create pagination metadata
-	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, total)
-
-	return utils.PaginatedResponse(c, fiber.Map{
-		"videos": videos,
-	}, paginationMeta)
 }
 
 // UpdateVideo updates video metadata - PUT /api/v1/videos/:id

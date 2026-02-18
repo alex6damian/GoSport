@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/alex6damian/GoSport/backend/models"
+	"github.com/alex6damian/GoSport/pkg/models"
 )
 
 var DB *gorm.DB
@@ -43,6 +43,7 @@ func RunMigrations() {
 		&models.NewsArticle{},
 		&models.Subscription{},
 		&models.Comment{},
+		&models.ProcessingJob{},
 	)
 
 	if err != nil {

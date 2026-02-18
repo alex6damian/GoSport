@@ -9,10 +9,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	"github.com/alex6damian/GoSport/backend/config"
-	"github.com/alex6damian/GoSport/backend/database"
 	"github.com/alex6damian/GoSport/backend/middleware"
 	"github.com/alex6damian/GoSport/backend/routes"
+	"github.com/alex6damian/GoSport/pkg/config"
+	"github.com/alex6damian/GoSport/pkg/database"
 )
 
 func main() {
