@@ -102,9 +102,10 @@ func setupRoutes(app *fiber.App) {
 
 	// Admin routes
 	admin := api.Group("/admin", middleware.AuthMiddleWare, middleware.AdminOnly)
-	admin.Post("/feeds", routes.CreateRSSFeed)         // Add RSS feed
-	admin.Get("/feeds", routes.GetRSSFeeds)            // List feeds
-	admin.Post("/feeds/:id/sync", routes.SyncRSSFeed)  // Manual sync
-	admin.Post("/feeds/sync-all", routes.SyncAllFeeds) // Sync all
-	admin.Delete("/feeds/:id", routes.DeleteRSSFeed)   // Delete feed
+	admin.Post("/feeds", routes.CreateRSSFeed)
+	admin.Get("/feeds", routes.GetRSSFeeds)
+	admin.Put("/feeds/:id", routes.UpdateRSSFeed)
+	admin.Post("/feeds/:id/sync", routes.SyncRSSFeed)
+	admin.Post("/feeds/sync-all", routes.SyncAllFeeds)
+	admin.Delete("/feeds/:id", routes.DeleteRSSFeed)
 }

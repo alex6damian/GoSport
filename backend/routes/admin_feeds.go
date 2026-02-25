@@ -13,6 +13,16 @@ import (
 
 // CreateRSSFeed adds new RSS feed (admin only)
 func CreateRSSFeed(c *fiber.Ctx) error {
+	// Get user from context (set by middleware)
+	user := c.Locals("user")
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"error":   "User not authenticated",
+		})
+	}
+
+	// Validate request body
 	var req struct {
 		Name     string `json:"name" validate:"required"`
 		URL      string `json:"url" validate:"required,url"`
@@ -21,13 +31,26 @@ func CreateRSSFeed(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&req); err != nil {
-		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "Invalid request body",
+		})
 	}
 
+	// Validate struct
 	if err := utils.ValidateStruct(req); err != nil {
-		return utils.ValidationErrorResponse(c, map[string]string{"validation": err.Error()})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   err.Error(),
+		})
 	}
 
+	// Set default language
+	if req.Language == "" {
+		req.Language = "en"
+	}
+
+	// Create feed
 	feed := models.RSSFeed{
 		Name:     req.Name,
 		URL:      req.URL,
@@ -37,7 +60,10 @@ func CreateRSSFeed(c *fiber.Ctx) error {
 	}
 
 	if err := database.DB.Create(&feed).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to create feed", fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to create feed: " + err.Error(),
+		})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -51,11 +77,17 @@ func CreateRSSFeed(c *fiber.Ctx) error {
 func GetRSSFeeds(c *fiber.Ctx) error {
 	var feeds []models.RSSFeed
 	if err := database.DB.Order("created_at DESC").Find(&feeds).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to fetch feeds", fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to fetch feeds",
+		})
 	}
 
-	return utils.SuccessResponse(c, fiber.Map{
-		"feeds": feeds,
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"feeds": feeds,
+		},
 	})
 }
 
@@ -67,15 +99,24 @@ func SyncRSSFeed(c *fiber.Ctx) error {
 
 	var id uint
 	if _, err := fmt.Sscanf(feedID, "%d", &id); err != nil {
-		return utils.ErrorResponse(c, "Invalid feed ID", fiber.StatusBadRequest)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "Invalid feed ID",
+		})
 	}
 
 	if err := rssService.FetchAndStore(id); err != nil {
-		return utils.ErrorResponse(c, fmt.Sprintf("Sync failed: %v", err), fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   fmt.Sprintf("Sync failed: %v", err),
+		})
 	}
 
-	return utils.SuccessResponse(c, fiber.Map{
-		"message": "Feed synced successfully",
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"message": "Feed synced successfully",
+		},
 	})
 }
 
@@ -84,11 +125,17 @@ func SyncAllFeeds(c *fiber.Ctx) error {
 	rssService := services.NewRSSService(database.DB)
 
 	if err := rssService.SyncAllFeeds(); err != nil {
-		return utils.ErrorResponse(c, fmt.Sprintf("Sync failed: %v", err), fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   fmt.Sprintf("Sync failed: %v", err),
+		})
 	}
 
-	return utils.SuccessResponse(c, fiber.Map{
-		"message": "All feeds synced successfully",
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"message": "All feeds synced successfully",
+		},
 	})
 }
 
@@ -97,10 +144,76 @@ func DeleteRSSFeed(c *fiber.Ctx) error {
 	feedID := c.Params("id")
 
 	if err := database.DB.Delete(&models.RSSFeed{}, feedID).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to delete feed", fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to delete feed",
+		})
 	}
 
-	return utils.SuccessResponse(c, fiber.Map{
-		"message": "Feed deleted successfully",
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"message": "Feed deleted successfully",
+		},
+	})
+}
+
+// UpdateRSSFeed updates feed configuration
+func UpdateRSSFeed(c *fiber.Ctx) error {
+	feedID := c.Params("id")
+
+	var req struct {
+		Name     string `json:"name"`
+		URL      string `json:"url"`
+		Sport    string `json:"sport"`
+		Language string `json:"language"`
+		Active   *bool  `json:"active"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "Invalid request body",
+		})
+	}
+
+	var feed models.RSSFeed
+	if err := database.DB.First(&feed, feedID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"success": false,
+			"error":   "Feed not found",
+		})
+	}
+
+	// Update fields if provided
+	if req.Name != "" {
+		feed.Name = req.Name
+	}
+	if req.URL != "" {
+		feed.URL = req.URL
+	}
+	if req.Sport != "" {
+		feed.Sport = req.Sport
+	}
+	if req.Language != "" {
+		feed.Language = req.Language
+	}
+	if req.Active != nil {
+		feed.Active = *req.Active
+	}
+
+	if err := database.DB.Save(&feed).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to update feed",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"message": "Feed updated successfully",
+			"feed":    feed,
+		},
 	})
 }
