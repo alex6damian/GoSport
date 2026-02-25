@@ -13,15 +13,6 @@ import (
 
 // CreateRSSFeed adds new RSS feed (admin only)
 func CreateRSSFeed(c *fiber.Ctx) error {
-	// Get user from context (set by middleware)
-	user := c.Locals("user")
-	if user == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"success": false,
-			"error":   "User not authenticated",
-		})
-	}
-
 	// Validate request body
 	var req struct {
 		Name     string `json:"name" validate:"required"`

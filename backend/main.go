@@ -81,18 +81,18 @@ func setupRoutes(app *fiber.App) {
 
 	// User routes
 	users := api.Group("/users")                                     // /api/v1/users
-	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile) // Middleware acts first as authentication gate
-	users.Put("/me", middleware.AuthMiddleWare, routes.UpdateMyProfile)
+	users.Get("/me", middleware.AuthMiddleware, routes.GetMyProfile) // Middleware acts first as authentication gate
+	users.Put("/me", middleware.AuthMiddleware, routes.UpdateMyProfile)
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideos)
 
 	// Video routes
 	videos := api.Group("/videos")
-	videos.Post("/upload", middleware.AuthMiddleWare, routes.UploadVideo)
+	videos.Post("/upload", middleware.AuthMiddleware, routes.UploadVideo)
 	videos.Get("/", routes.ListVideos)
 	videos.Get("/:id", routes.GetVideo)
-	videos.Put("/:id", middleware.AuthMiddleWare, routes.UpdateVideo)
-	videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
+	videos.Put("/:id", middleware.AuthMiddleware, routes.UpdateVideo)
+	videos.Delete("/:id", middleware.AuthMiddleware, routes.DeleteVideo)
 
 	// News routes
 	news := api.Group("/news")
@@ -100,12 +100,16 @@ func setupRoutes(app *fiber.App) {
 	news.Get("/:id", routes.GetNewsArticle)          // Get single article
 	news.Get("/sport/:sport", routes.GetNewsBySport) // Filter by sport
 
-	// Admin routes
-	admin := api.Group("/admin", middleware.AuthMiddleWare, middleware.AdminOnly)
-	admin.Post("/feeds", routes.CreateRSSFeed)
-	admin.Get("/feeds", routes.GetRSSFeeds)
-	admin.Put("/feeds/:id", routes.UpdateRSSFeed)
-	admin.Post("/feeds/:id/sync", routes.SyncRSSFeed)
-	admin.Post("/feeds/sync-all", routes.SyncAllFeeds)
-	admin.Delete("/feeds/:id", routes.DeleteRSSFeed)
+	// Admin routes (logs for debugging and verification)
+	log.Println("📋 Registering admin routes...")
+	adminAuth := api.Group("/admin", middleware.AuthMiddleware, middleware.AdminOnly)
+	log.Println("✅ Registered: POST /admin/feeds")
+	adminAuth.Post("/feeds", routes.CreateRSSFeed)
+	log.Println("✅ Registered: GET /admin/feeds")
+	adminAuth.Get("/feeds", routes.GetRSSFeeds)
+	adminAuth.Put("/feeds/:id", routes.UpdateRSSFeed)
+	adminAuth.Delete("/feeds/:id", routes.DeleteRSSFeed)
+	adminAuth.Post("/feeds/:id/sync", routes.SyncRSSFeed)
+	adminAuth.Post("/feeds/sync-all", routes.SyncAllFeeds)
+	log.Println("✅ All admin routes registered")
 }
