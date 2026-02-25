@@ -84,7 +84,7 @@ The system is built using a modular monolithic architecture (with the possibilit
 - ✅ Video CRUD
 
 - ### Content & Discovery
-- ⬜ RSS news aggregation
+- ✅ RSS news aggregation
 - ⬜ Meilisearch integration
 - ⬜ Subscriptions
 - ⬜ Feed algorithm
