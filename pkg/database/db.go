@@ -44,6 +44,7 @@ func RunMigrations() {
 		&models.Subscription{},
 		&models.Comment{},
 		&models.ProcessingJob{},
+		&models.RSSFeed{},
 	)
 
 	if err != nil {

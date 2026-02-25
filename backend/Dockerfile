@@ -1,37 +1,34 @@
-# Build
+# Build stage
 FROM golang:1.24-alpine AS builder
 
-# Working directory for source code
 WORKDIR /src
 
-# Copy all module files first for caching
-COPY pkg/go.mod pkg/go.sum ./pkg/
+# Copy module files (including pkg if needed)
 COPY backend/go.mod backend/go.sum ./backend/
+COPY pkg/go.mod pkg/go.sum ./pkg/                    
 
-# Download dependencies for pkg
-RUN cd pkg && go mod download
+# Download dependencies for backend
+RUN cd backend && go mod download
 
-# Set working directory to backend
-WORKDIR /src/backend
-
-# Download dependencies for backend. Now, the path ../pkg is correct!
-RUN go mod download
-
-# Copy the rest of the source code
-WORKDIR /src
-COPY pkg/ ./pkg/
+# Copy source code
 COPY backend/ ./backend/
+COPY pkg/ ./pkg/                                     
 
-# Set working directory back to backend for building
+# Build
 WORKDIR /src/backend
-RUN CGO_ENABLED=0 GOOS=linux go build -o /backend-app .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /backend-app .
 
-# Run
+# Run stage
 FROM alpine:latest
+
+# Install wget for healthcheck + ca-certificates for HTTPS
+RUN apk update && apk add --no-cache wget ca-certificates tzdata
+
 WORKDIR /
 COPY --from=builder /backend-app .
-EXPOSE 8080
 
 RUN chmod +x /backend-app
+
+EXPOSE 8080
 
 CMD ["./backend-app"]

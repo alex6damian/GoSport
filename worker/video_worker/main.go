@@ -15,12 +15,19 @@ import (
 	"github.com/alex6damian/GoSport/pkg/database"
 	"github.com/alex6damian/GoSport/pkg/models"
 	"github.com/minio/minio-go/v7"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func main() {
-	// Initialize Database and run migrations
-	database.InitDB()
+	// Just connect to the database (migrations should already be done by the API service)
+	dsn := os.Getenv("DATABASE_URL")
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
+	}
+
+	database.DB = db // Set global DB variable
 
 	// Initialize MinIO client and bucket
 	if err := config.InitMinio(); err != nil {

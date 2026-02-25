@@ -93,4 +93,18 @@ func setupRoutes(app *fiber.App) {
 	videos.Get("/:id", routes.GetVideo)
 	videos.Put("/:id", middleware.AuthMiddleWare, routes.UpdateVideo)
 	videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
+
+	// News routes
+	news := api.Group("/news")
+	news.Get("/", routes.GetNews)                    // List all news
+	news.Get("/:id", routes.GetNewsArticle)          // Get single article
+	news.Get("/sport/:sport", routes.GetNewsBySport) // Filter by sport
+
+	// Admin routes
+	admin := api.Group("/admin", middleware.AuthMiddleWare, middleware.AdminOnly)
+	admin.Post("/feeds", routes.CreateRSSFeed)         // Add RSS feed
+	admin.Get("/feeds", routes.GetRSSFeeds)            // List feeds
+	admin.Post("/feeds/:id/sync", routes.SyncRSSFeed)  // Manual sync
+	admin.Post("/feeds/sync-all", routes.SyncAllFeeds) // Sync all
+	admin.Delete("/feeds/:id", routes.DeleteRSSFeed)   // Delete feed
 }
