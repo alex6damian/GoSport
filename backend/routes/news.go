@@ -57,6 +57,20 @@ func GetNews(c *fiber.Ctx) error {
 	}, paginationMeta)
 }
 
+// Gets single article by ID
+func GetNewsArticle(c *fiber.Ctx) error {
+	articleID := c.Params("id")
+
+	var article models.NewsArticle
+	if err := database.DB.First(&article, articleID).Error; err != nil {
+		return utils.ErrorResponse(c, "Article not found", fiber.StatusNotFound)
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"article": article,
+	})
+}
+
 // Gets news filtered by sport
 func GetNewsBySport(c *fiber.Ctx) error {
 	sport := c.Params("sport")
