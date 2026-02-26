@@ -9,12 +9,15 @@ backend/                       # 🔐 High-performance backend serving as the co
 ├── go.sum                     # 🔒 Checksums for dependencies (security)
 │
 ├── middleware/                # 🛡️ HTTP middleware (functions that run before handlers)
-│   ├── auth.go                # 🔑 JWT verification (validates token in Authorization header)
+│   ├── auth.go                # 🔑 JWT verification (validates token in Authorization header) 
 │   ├── error_handler.go       # ⚠️ Unexpected server errors handler
 │   └── rate_limiter.go        # ✋ Brute-force protection
 │
 ├── routes/                    # 🛣️ HTTP handlers (business logic for endpoints)
+│   ├── admin_feeds.go         # 🛡️ Admin RSS routes
 │   ├── auth.go                # 🔐 Register & Login handlers (POST /auth/register, /auth/login)
+|   ├── meilisearch.go         # 🕵🏻 Videos/News search routes (GET /search/videos, /search/news)
+│   ├── news.go                # 🗞️ News (GET all news, filtered news or single article)
 │   ├── users.go               # 👤 User CRUD handlers (GET/PUT /users/me, users/:username, users/:username/videos)
 │   └── videos.go              # 🎬 Video CRUD handlers (POST /videos/upload, GET /videos, GET /videos/:id, PUT /videos/:id, DELETE /videos/:id)
 │
@@ -37,6 +40,7 @@ pkg/                           # 📦 Shared packages (used by backend + workers
 ├── go.sum                     # 🔒 Shared checksums
 ├── config/                    # ⚙️ Application configuration
 │   ├── cors.go                # 📌 Enhanced CORS configuration
+|   ├── meilisearch.go         # 🔎 Meilisearch client setup
 │   └── minio.go               # 🗄️ MinIO client initialization & bucket setup
 │
 ├── database/
@@ -89,10 +93,13 @@ Intermediate functions for request processing:
 
 ### 🛣️ Routes (backend/routes/)
 Controllers for API endpoints:
+- **admin_feeds.go** - RSS feed management (admin only: create, list, update, delete, sync)
 - **auth.go** - Authentication (register, login)
+- **meilisearch.go** - Search tools
+- **news.go** - News Tools
 - **users.go** - User CRUD (view/edit profile, check videos/profiles)
 - **videos.go** - Video management (upload, list, get details with presigned URLs, update, delete)
-- **admin_feeds.go** - RSS feed management (admin only: create, list, update, delete, sync)
+
 
 ### 🔧 Services (backend/services/)
 Business logic layer:
@@ -114,6 +121,7 @@ Reusable helper functions:
 
 ### ⚙️ Configuration (pkg/config/)
 - **cors.go** - Cross-Origin Resource Sharing configuration for API access
+- **meilisearch.go** - Meilisearch engine client configuration
 - **minio.go** - MinIO object storage client initialization and bucket management
 
 ### 🗄️ Database (pkg/database/)
@@ -230,6 +238,9 @@ Go structs that map to database tables:
 - `POST /api/v1/admin/feeds/:id/sync` - Sync specific feed
 - `POST /api/v1/admin/feeds/sync-all` - Sync all active feeds
 
+### Meilisearch 
+-	`GET /api/v1/search/videos` - Search for videos
+-	`GET /api/v1/search/news` - Search for news
 
 ## Getting Started
 ```bash
