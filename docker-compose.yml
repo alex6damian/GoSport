@@ -27,8 +27,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports: 
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
+      - "${MINIO_PORT}:${MINIO_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_PORT}"
     volumes:
       - minio_data:/data
     networks:
@@ -44,12 +44,14 @@ services:
     image: getmeili/meilisearch:latest
     container_name: gosport-meilisearch
     restart: unless-stopped
+    environment: 
+      MEILI_PORT: ${MEILI_PORT}
+      MEILI_URL: ${MEILI_URL}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: true
     ports:
       - "${MEILI_PORT}:${MEILI_PORT}"
-    environment: 
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
-      - MEILI_ENV=development
-      - MEILI_NO_ANALYTICS=true
     volumes:  
       - meilisearch_data:/meilisearch_data
     networks:
@@ -84,7 +86,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}           
-      MEILI_URL: http://meilisearch:7700
+      MEILI_URL: ${MEILI_URL}
+      MEILI_PORT: ${MEILI_PORT}
       MEILI_KEY: ${MEILI_MASTER_KEY}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
@@ -140,7 +143,7 @@ services:
 volumes:
   postgres_data: 
   minio_data:
-  meili_data:  
+  meilisearch_data:  
 
 networks:
   gosport-network:
