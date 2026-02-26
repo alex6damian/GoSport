@@ -88,7 +88,7 @@ services:
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}           
       MEILI_URL: ${MEILI_URL}
       MEILI_PORT: ${MEILI_PORT}
-      MEILI_KEY: ${MEILI_MASTER_KEY}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     networks:

@@ -1,9 +1,13 @@
 package routes
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +74,21 @@ func UploadVideo(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "Title is required", fiber.StatusBadRequest)
 	}
 
+	// Save temp file
+	tempPath := filepath.Join(os.TempDir(), fmt.Sprintf("upload_%d_%s", time.Now().Unix(), file.Filename))
+	if err := c.SaveFile(file, tempPath); err != nil {
+		return utils.ErrorResponse(c, "Failed to save file", fiber.StatusInternalServerError)
+	}
+	defer os.Remove(tempPath)
+
+	// Extract duration
+	duration, err := ExtractDuration(tempPath)
+	if err != nil {
+		log.Printf("Failed to extract duration: %v", err)
+		duration = 0
+	}
+	log.Printf("Duration: %d seconds", duration)
+
 	// Open file
 	fileHeader, err := file.Open()
 	if err != nil {
@@ -90,6 +109,7 @@ func UploadVideo(c *fiber.Ctx) error {
 		Sport:       sport,
 		UserID:      userID,
 		Tags:        tags,
+		Duration:    duration,
 		MinioKey:    minioKey,
 		FileName:    file.Filename,
 		FileSize:    file.Size,
@@ -390,4 +410,59 @@ func DeleteVideoFromMeilisearch(videoID uint) {
 	} else {
 		log.Printf("✅ Deleted video %d from Meilisearch", videoID)
 	}
+}
+
+func ExtractDuration(videoPath string) (int, error) {
+	log.Printf("🔍 Extracting duration from: %s", videoPath)
+
+	// Check if file exists
+	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
+		log.Printf("❌ File does not exist: %s", videoPath)
+		return 0, fmt.Errorf("file not found: %s", videoPath)
+	}
+
+	// Check file size
+	fileInfo, _ := os.Stat(videoPath)
+	log.Printf("📊 File size: %d bytes", fileInfo.Size())
+
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		videoPath,
+	)
+
+	// Capture both stdout and stderr (important channels for debugging)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("❌ ffprobe failed: %v", err)
+		log.Printf("   stderr: %s", stderr.String())
+		log.Printf("   stdout: %s", stdout.String())
+		return 0, fmt.Errorf("ffprobe failed: %w", err)
+	}
+
+	output := stdout.String()
+	log.Printf("📊 ffprobe output: '%s'", output)
+
+	if output == "" || output == "\n" {
+		log.Println("⚠️ ffprobe returned empty duration")
+		return 0, fmt.Errorf("empty duration")
+	}
+
+	// Parse duration
+	durationStr := strings.TrimSpace(output)
+	durationFloat, err := strconv.ParseFloat(durationStr, 64)
+	if err != nil {
+		log.Printf("❌ Failed to parse duration '%s': %v", durationStr, err)
+		return 0, fmt.Errorf("failed to parse duration: %w", err)
+	}
+
+	duration := int(durationFloat)
+	log.Printf("✅ Extracted duration: %d seconds", duration)
+
+	return duration, nil
 }

@@ -84,5 +84,17 @@ func CreateIndexes() {
 		"published_at",
 	})
 
-	log.Println("✅ Meilisearch indexes configured")
+	// Typo tolerance settings
+	typoTolerence := &meilisearch.TypoTolerance{
+		Enabled: true,
+		MinWordSizeForTypos: meilisearch.MinWordSizeForTypos{
+			OneTypo:  4,
+			TwoTypos: 8,
+		},
+	}
+
+	videosIndex.UpdateTypoTolerance(typoTolerence)
+	newsIndex.UpdateTypoTolerance(typoTolerence)
+
+	log.Println("✅ Meilisearch indexes with typo tolerance configured")
 }

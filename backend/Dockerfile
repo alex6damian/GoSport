@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /backend-app .
 FROM alpine:latest
 
 # Install wget for healthcheck + ca-certificates for HTTPS
-RUN apk update && apk add --no-cache wget ca-certificates tzdata
+RUN apk update && apk add --no-cache ffmpeg wget ca-certificates tzdata
 
 WORKDIR /
 COPY --from=builder /backend-app .
