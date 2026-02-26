@@ -24,6 +24,9 @@ func main() {
 		log.Fatalf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
 	}
 
+	// Initialize Meilisearch client and indexes
+	config.InitMeilisearch()
+
 	// Fiber setup
 	app := fiber.New(fiber.Config{
 		AppName:      "GoSport API v1",
@@ -113,4 +116,10 @@ func setupRoutes(app *fiber.App) {
 	adminAuth.Post("/feeds/:id/sync", routes.SyncRSSFeed)
 	adminAuth.Post("/feeds/sync-all", routes.SyncAllFeeds)
 	log.Println("✅ Admin routes registered")
+
+	// Meilisearch routes
+	search := api.Group("/search")
+	search.Get("/videos", routes.SearchVideos)
+	search.Get("/news", routes.SearchNews)
+	log.Println("✅ Search routes registered")
 }
