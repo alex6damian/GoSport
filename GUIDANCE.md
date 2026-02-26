@@ -133,7 +133,7 @@ Go structs that map to database tables:
 
 ## ⚙️ Background Workers (worker/)
 
-### 📰 RSS Worker (worker/rss_worker/)
+### 📰 RSS(Really Simple Syndication) Worker (worker/rss_worker/)
 **Purpose:** Automatically fetches sports news from RSS feeds
 
 **How it works:**
