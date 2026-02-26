@@ -236,3 +236,9 @@ Go structs that map to database tables:
 # Clean build
 ./testing\ scripts/video_upload_test.sh 
 ```
+
+## TODO(Meilisearch):
+- Index videos on Upload
+- Create search endpoint
+- Register routes
+- Testing script
