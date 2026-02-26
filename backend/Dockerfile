@@ -1,39 +1,34 @@
 # Build stage
-FROM golang:alpine AS builder
+FROM golang:1.24-alpine AS builder
 
-WORKDIR /app
+WORKDIR /src
 
-# Install dependencies
-RUN apk add --no-cache git gcc musl-dev
+# Copy module files (including pkg if needed)
+COPY backend/go.mod backend/go.sum ./backend/
+COPY pkg/go.mod pkg/go.sum ./pkg/                    
 
-# Copy go.mod and go.sum
-COPY go.mod go.sum ./
-RUN go mod download
+# Download dependencies for backend
+RUN cd backend && go mod download
 
-# Copy all source code
-COPY . . 
+# Copy source code
+COPY backend/ ./backend/
+COPY pkg/ ./pkg/                                     
 
-# Build application
-RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+# Build
+WORKDIR /src/backend
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /backend-app .
 
-# Check if exists (debug)
-RUN ls -lh /app/main
-
-# Run stage (final image)
+# Run stage
 FROM alpine:latest
 
-WORKDIR /app
+# Install wget for healthcheck + ca-certificates for HTTPS
+RUN apk update && apk add --no-cache wget ca-certificates tzdata
 
-# Install CA certificates
-RUN apk --no-cache add ca-certificates
+WORKDIR /
+COPY --from=builder /backend-app .
 
-# Copy executable from builder
-COPY --from=builder /app/main ./main
-
-# Check if exists
-RUN ls -lh ./main && chmod +x ./main
+RUN chmod +x /backend-app
 
 EXPOSE 8080
 
-# Run executable
-CMD ["./main"]
+CMD ["./backend-app"]

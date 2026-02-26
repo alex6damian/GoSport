@@ -9,10 +9,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	"github.com/alex6damian/GoSport/backend/config"
-	"github.com/alex6damian/GoSport/backend/database"
 	"github.com/alex6damian/GoSport/backend/middleware"
 	"github.com/alex6damian/GoSport/backend/routes"
+	"github.com/alex6damian/GoSport/pkg/config"
+	"github.com/alex6damian/GoSport/pkg/database"
 )
 
 func main() {
@@ -21,8 +21,7 @@ func main() {
 
 	// Initialize MinIO client and bucket
 	if err := config.InitMinio(); err != nil {
-		log.Printf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
-		log.Println("⚠️  Video upload will NOT work, but API will continue...")
+		log.Fatalf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
 	}
 
 	// Fiber setup
@@ -79,19 +78,39 @@ func setupRoutes(app *fiber.App) {
 	auth := api.Group("/auth", middleware.AuthRateLimiter()) // /api/v1/auth
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
+	log.Println("✅ Auth routes registered")
 
 	// User routes
 	users := api.Group("/users")                                     // /api/v1/users
-	users.Get("/me", middleware.AuthMiddleWare, routes.GetMyProfile) // Middleware acts first as authentication gate
-	users.Put("/me", middleware.AuthMiddleWare, routes.UpdateMyProfile)
+	users.Get("/me", middleware.AuthMiddleware, routes.GetMyProfile) // Middleware acts first as authentication gate
+	users.Put("/me", middleware.AuthMiddleware, routes.UpdateMyProfile)
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideos)
+	log.Println("✅ User routes registered")
 
 	// Video routes
 	videos := api.Group("/videos")
-	videos.Post("/upload", middleware.AuthMiddleWare, routes.UploadVideo)
+	videos.Post("/upload", middleware.AuthMiddleware, routes.UploadVideo)
 	videos.Get("/", routes.ListVideos)
 	videos.Get("/:id", routes.GetVideo)
-	videos.Put("/:id", middleware.AuthMiddleWare, routes.UpdateVideo)
-	videos.Delete("/:id", middleware.AuthMiddleWare, routes.DeleteVideo)
+	videos.Put("/:id", middleware.AuthMiddleware, routes.UpdateVideo)
+	videos.Delete("/:id", middleware.AuthMiddleware, routes.DeleteVideo)
+	log.Println("✅ Video routes registered")
+
+	// News routes
+	news := api.Group("/news")
+	news.Get("/", routes.GetNews)                    // List all news
+	news.Get("/:id", routes.GetNewsArticle)          // Get single article
+	news.Get("/sport/:sport", routes.GetNewsBySport) // Filter by sport
+	log.Println("✅ News routes registered")
+
+	// Admin routes (logs for debugging and verification)
+	adminAuth := api.Group("/admin", middleware.AuthMiddleware, middleware.AdminOnly)
+	adminAuth.Post("/feeds", routes.CreateRSSFeed)
+	adminAuth.Get("/feeds", routes.GetRSSFeeds)
+	adminAuth.Put("/feeds/:id", routes.UpdateRSSFeed)
+	adminAuth.Delete("/feeds/:id", routes.DeleteRSSFeed)
+	adminAuth.Post("/feeds/:id/sync", routes.SyncRSSFeed)
+	adminAuth.Post("/feeds/sync-all", routes.SyncAllFeeds)
+	log.Println("✅ Admin routes registered")
 }

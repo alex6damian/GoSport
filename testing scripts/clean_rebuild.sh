@@ -1,33 +1,39 @@
 #!/bin/bash
 
-echo "🧹 Complete Docker cleanup..."
+echo "🧹 Cleaning database and rebuilding..."
 
 # Stop all
-docker compose down
+docker-compose down
 
-# Remove containers
-docker rm -f gosport-api 2>/dev/null
+# Remove database volume (CAUTION: Deletes all data!)
+docker volume rm gosport_postgres_data
 
-# Remove images
-docker rmi gosport-backend gosport_backend 2>/dev/null
+# Remove old images
+docker rmi gosport_backend gosport_rss-worker gosport_video-worker 2>/dev/null || true
 
 # Clean build cache
-docker builder prune -af
+docker builder prune -f
 
-# Clean system
-docker system prune -af
+# Rebuild all
+docker-compose build --no-cache
 
-echo "🔨 Rebuilding..."
+# Start database first
+docker-compose up -d db
+sleep 5
 
-# Rebuild without cache
-DOCKER_BUILDKIT=1 docker compose build --no-cache --pull backend
+# Start backend (runs migrations)
+docker-compose up -d backend
 
-echo "🚀 Starting..."
+# Wait for migrations
+sleep 10
 
-# Start
-docker compose up -d backend
+# Check backend logs
+echo "📋 Backend migration logs:"
+docker logs gosport-api 2>&1 | grep -A5 "migrations"
 
-echo "📋 Logs:"
+# Start workers
+docker-compose up -d video-worker rss-worker
 
-# Show logs
-docker logs -f gosport-api
+echo "✅ Done! Check logs:"
+echo "docker logs gosport-api"
+echo "docker logs gosport-rss-worker"

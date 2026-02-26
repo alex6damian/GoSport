@@ -2,16 +2,18 @@ package routes
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 
-	"github.com/alex6damian/GoSport/backend/database"
-	"github.com/alex6damian/GoSport/backend/models"
 	"github.com/alex6damian/GoSport/backend/services"
 	"github.com/alex6damian/GoSport/backend/utils"
+	"github.com/alex6damian/GoSport/pkg/database"
+	"github.com/alex6damian/GoSport/pkg/models"
 )
 
 // Allowed video formats
@@ -89,13 +91,26 @@ func UploadVideo(c *fiber.Ctx) error {
 		FileName:    file.Filename,
 		FileSize:    file.Size,
 		MimeType:    file.Header.Get("Content-Type"),
-		Status:      "ready", // "ready" for simplicity, in real app this would be "pending" and a background worker would process it
+		Status:      "pending", // "ready" for simplicity, in real app this would be "pending" and a background worker would process it
 	}
 
 	if err := database.DB.Create(&video).Error; err != nil {
 		// Cleanup: delete from MinIO if DB insert fails
 		services.DeleteVideo(minioKey)
 		return utils.ErrorResponse(c, "Failed to save video", fiber.StatusInternalServerError)
+	}
+
+	// Create processing job
+	processingJob := models.ProcessingJob{
+		VideoID: video.ID,
+		Status:  "queued",
+	}
+
+	if err := database.DB.Create(&processingJob).Error; err != nil {
+		// Cleanup: delete video record and MinIO file if job creation fails
+		database.DB.Delete(&video)
+		services.DeleteVideo(minioKey)
+		return utils.ErrorResponse(c, "Failed to create processing job", fiber.StatusInternalServerError)
 	}
 
 	// Load user info
@@ -105,74 +120,6 @@ func UploadVideo(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Video uploaded successfully",
 		"data":    video,
-	})
-}
-
-// GetVideo retrieves video details with presigned URL - GET /api/v1/videos/:id
-func GetVideo(c *fiber.Ctx) error {
-	videoID := c.Params("id")
-
-	var video models.Video
-	if err := database.DB.Preload("User").Preload("Comments").First(&video, videoID).Error; err != nil {
-		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
-	}
-
-	// Generate presigned URL (valid for 1 hour)
-	videoURL, err := services.GetVideoURL(video.MinioKey, 1*time.Hour)
-	if err != nil {
-		return utils.ErrorResponse(c, "Failed to generate video URL", fiber.StatusInternalServerError)
-	}
-
-	// Generate thumbnail URL if exists
-	var thumbnailURL string
-	if video.Thumbnail != "" {
-		thumbnailURL, _ = services.GetVideoURL(video.Thumbnail, 1*time.Hour)
-	}
-
-	// Increment views
-	database.DB.Model(&video).UpdateColumn("views", video.Views+1)
-
-	return utils.SuccessResponse(c, fiber.Map{
-		"video":         video,
-		"video_url":     videoURL,
-		"thumbnail_url": thumbnailURL,
-	})
-}
-
-// DeleteVideo deletes video from MinIO and database - DELETE /api/v1/videos/:id
-func DeleteVideo(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(uint)
-	videoID := c.Params("id")
-
-	var video models.Video
-	if err := database.DB.First(&video, videoID).Error; err != nil {
-		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
-	}
-
-	// Check ownership
-	if video.UserID != userID {
-		return utils.ErrorResponse(c, "You don't have permission to delete this video", fiber.StatusForbidden)
-	}
-
-	// Delete video file from MinIO
-	if video.MinioKey != "" {
-		if err := services.DeleteVideo(video.MinioKey); err != nil {
-			return utils.ErrorResponse(c, "Failed to delete video file", fiber.StatusInternalServerError)
-		}
-	}
-
-	// Delete thumbnail from MinIO if exists
-	if video.Thumbnail != "" {
-		services.DeleteVideo(video.Thumbnail) // Ignore error for thumbnail
-	}
-
-	// Delete from database (soft delete)
-	if err := database.DB.Delete(&video).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to delete video record", fiber.StatusInternalServerError)
-	}
-
-	return utils.SuccessResponse(c, fiber.Map{
-		"message": "Video deleted successfully",
 	})
 }
 
@@ -227,6 +174,97 @@ func ListVideos(c *fiber.Ctx) error {
 	return utils.PaginatedResponse(c, fiber.Map{
 		"videos": videos,
 	}, paginationMeta)
+}
+
+// GetVideo retrieves video details with presigned URL - GET /api/v1/videos/:id
+func GetVideo(c *fiber.Ctx) error {
+	videoID := c.Params("id")
+
+	var video models.Video
+	if err := database.DB.Preload("User").Preload("Comments").First(&video, videoID).Error; err != nil {
+		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
+	}
+
+	// Generate presigned URL (valid for 1 hour)
+	videoURL, err := services.GetVideoURL(video.MinioKey, 1*time.Hour)
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to generate video URL", fiber.StatusInternalServerError)
+	}
+
+	// Generate thumbnail URL if exists
+	var thumbnailURL string
+	if video.Thumbnail != "" {
+		thumbnailURL, _ = services.GetVideoURL(video.Thumbnail, 1*time.Hour)
+	}
+
+	// Increment views
+	database.DB.Model(&video).UpdateColumn("views", video.Views+1)
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"video":         video,
+		"video_url":     videoURL,
+		"thumbnail_url": thumbnailURL,
+	})
+}
+
+// DeleteVideo deletes video from MinIO and database - DELETE /api/v1/videos/:id
+func DeleteVideo(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	videoID := c.Params("id")
+
+	var video models.Video
+	if err := database.DB.First(&video, videoID).Error; err != nil {
+		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
+	}
+
+	// Check ownership
+	if video.UserID != userID {
+		return utils.ErrorResponse(c, "You don't have permission to delete this video", fiber.StatusForbidden)
+	}
+
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Delete associated comments first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.Comment{}).Error; err != nil {
+			return err
+		}
+		// Delete associated processing jobs first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.ProcessingJob{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&video).Error; err != nil {
+			return err
+		}
+
+		// if video.Status == "ready" {
+		// 	services.DeleteHLSFolder(video.ID)
+		// }
+
+		return nil
+	})
+
+	if err != nil {
+		// Log the error for debugging purposes, but return a generic message to the client
+		log.Printf("Failed to delete video and associated data: %v", err)
+		return utils.ErrorResponse(c, "Failed to delete video", fiber.StatusInternalServerError)
+	}
+
+	go func() {
+		if video.MinioKey != "" {
+			services.DeleteVideo(video.MinioKey)
+		}
+		if video.Thumbnail != "" {
+			services.DeleteVideo(video.Thumbnail)
+		}
+	}()
+
+	// Delete from database (soft delete)
+	if err := database.DB.Delete(&video).Error; err != nil {
+		return utils.ErrorResponse(c, "Failed to delete video record", fiber.StatusInternalServerError)
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"message": "Video deleted successfully",
+	})
 }
 
 // UpdateVideo updates video metadata - PUT /api/v1/videos/:id

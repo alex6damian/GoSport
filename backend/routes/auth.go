@@ -1,9 +1,9 @@
 package routes
 
 import (
-	"github.com/alex6damian/GoSport/backend/database"
-	"github.com/alex6damian/GoSport/backend/models"
 	"github.com/alex6damian/GoSport/backend/utils"
+	"github.com/alex6damian/GoSport/pkg/database"
+	"github.com/alex6damian/GoSport/pkg/models"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
