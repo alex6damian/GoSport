@@ -9,6 +9,7 @@ COPY pkg/go.mod pkg/go.sum ./pkg/
 
 # Download dependencies for backend
 RUN cd backend && go mod download
+RUN cd backend && go mod tidy
 
 # Copy source code
 COPY backend/ ./backend/

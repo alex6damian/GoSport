@@ -10,6 +10,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
+	github.com/meilisearch/meilisearch-go v0.36.1
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/mmcdole/gofeed v1.3.0
 	golang.org/x/crypto v0.46.0
@@ -40,7 +41,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/meilisearch/meilisearch-go v0.36.1 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mmcdole/goxpp v1.1.1-0.20240225020742-a0c311522b23 // indirect
