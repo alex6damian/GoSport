@@ -12,6 +12,7 @@ import (
 
 	"github.com/alex6damian/GoSport/backend/services"
 	"github.com/alex6damian/GoSport/backend/utils"
+	"github.com/alex6damian/GoSport/pkg/config"
 	"github.com/alex6damian/GoSport/pkg/database"
 	"github.com/alex6damian/GoSport/pkg/models"
 )
@@ -62,6 +63,7 @@ func UploadVideo(c *fiber.Ctx) error {
 	title := c.FormValue("title")
 	description := c.FormValue("description")
 	sport := c.FormValue("sport") // football, basketball, etc.
+	tags := c.FormValue("tags")   // comma-separated tags
 
 	// Validate required fields
 	if title == "" {
@@ -87,6 +89,7 @@ func UploadVideo(c *fiber.Ctx) error {
 		Description: description,
 		Sport:       sport,
 		UserID:      userID,
+		Tags:        tags,
 		MinioKey:    minioKey,
 		FileName:    file.Filename,
 		FileSize:    file.Size,
@@ -116,10 +119,134 @@ func UploadVideo(c *fiber.Ctx) error {
 	// Load user info
 	database.DB.Preload("User").First(&video, video.ID)
 
+	// Index video in Meilisearch
+	go IndexVideoToMeilisearch(video)
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"success": true,
 		"message": "Video uploaded successfully",
 		"data":    video,
+	})
+}
+
+// UpdateVideo updates video metadata - PUT /api/v1/videos/:id
+func UpdateVideo(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	videoID := c.Params("id")
+
+	var video models.Video
+	if err := database.DB.First(&video, videoID).Error; err != nil {
+		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
+	}
+
+	// Check ownership
+	if video.UserID != userID {
+		return utils.ErrorResponse(c, "You don't have permission to update this video", fiber.StatusForbidden)
+	}
+
+	// Parse request body
+	var updates struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Sport       string `json:"sport"`
+		Tags        string `json:"tags"`
+	}
+
+	if err := c.BodyParser(&updates); err != nil {
+		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
+	}
+
+	// Update fields
+	if updates.Title != "" {
+		video.Title = updates.Title
+	}
+	if updates.Description != "" {
+		video.Description = updates.Description
+	}
+	if updates.Sport != "" {
+		video.Sport = updates.Sport
+	}
+	if updates.Tags != "" {
+		video.Tags = updates.Tags
+	}
+
+	// Save updates
+	if err := database.DB.Save(&video).Error; err != nil {
+		return utils.ErrorResponse(c, "Failed to update video", fiber.StatusInternalServerError)
+	}
+
+	// Load relations
+	database.DB.Preload("User").First(&video, video.ID)
+
+	// Update Meilisearch index
+	go UpdateVideoInMeilisearch(video)
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"message": "Video updated successfully",
+		"video":   video,
+	})
+}
+
+// DeleteVideo deletes video from MinIO and database - DELETE /api/v1/videos/:id
+func DeleteVideo(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	videoID := c.Params("id")
+
+	var video models.Video
+	if err := database.DB.First(&video, videoID).Error; err != nil {
+		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
+	}
+
+	// Check ownership
+	if video.UserID != userID {
+		return utils.ErrorResponse(c, "You don't have permission to delete this video", fiber.StatusForbidden)
+	}
+
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Delete associated comments first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.Comment{}).Error; err != nil {
+			return err
+		}
+		// Delete associated processing jobs first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.ProcessingJob{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&video).Error; err != nil {
+			return err
+		}
+
+		// if video.Status == "ready" {
+		// 	services.DeleteHLSFolder(video.ID)
+		// }
+
+		return nil
+	})
+
+	if err != nil {
+		// Log the error for debugging purposes, but return a generic message to the client
+		log.Printf("Failed to delete video and associated data: %v", err)
+		return utils.ErrorResponse(c, "Failed to delete video", fiber.StatusInternalServerError)
+	}
+
+	go func() {
+		if video.MinioKey != "" {
+			services.DeleteVideo(video.MinioKey)
+		}
+		if video.Thumbnail != "" {
+			services.DeleteVideo(video.Thumbnail)
+		}
+	}()
+
+	// Delete from database (soft delete)
+	if err := database.DB.Delete(&video).Error; err != nil {
+		return utils.ErrorResponse(c, "Failed to delete video record", fiber.StatusInternalServerError)
+	}
+
+	// Remove from Meilisearch index
+	go DeleteVideoFromMeilisearch(video.ID)
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"message": "Video deleted successfully",
 	})
 }
 
@@ -207,113 +334,60 @@ func GetVideo(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteVideo deletes video from MinIO and database - DELETE /api/v1/videos/:id
-func DeleteVideo(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(uint)
-	videoID := c.Params("id")
-
-	var video models.Video
-	if err := database.DB.First(&video, videoID).Error; err != nil {
-		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
+// Indexes a video in Meilisearch for search functionality.
+func IndexVideoToMeilisearch(video models.Video) {
+	documents := []map[string]interface{}{
+		{
+			"id":          video.ID,
+			"title":       video.Title,
+			"description": video.Description,
+			"sport":       video.Sport,
+			"uploader":    video.User.Username,
+			"created_at":  video.CreatedAt,
+			"views":       video.Views,
+			"likes":       video.Likes,
+			"tags":        video.Tags,
+		},
 	}
 
-	// Check ownership
-	if video.UserID != userID {
-		return utils.ErrorResponse(c, "You don't have permission to delete this video", fiber.StatusForbidden)
-	}
-
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		// Delete associated comments first (child records)
-		if err := tx.Where("video_id = ?", video.ID).Delete(&models.Comment{}).Error; err != nil {
-			return err
-		}
-		// Delete associated processing jobs first (child records)
-		if err := tx.Where("video_id = ?", video.ID).Delete(&models.ProcessingJob{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Delete(&video).Error; err != nil {
-			return err
-		}
-
-		// if video.Status == "ready" {
-		// 	services.DeleteHLSFolder(video.ID)
-		// }
-
-		return nil
-	})
-
+	// Add document to Meilisearch index
+	_, err := config.MeiliClient.Index("videos").AddDocuments(documents, nil)
 	if err != nil {
-		// Log the error for debugging purposes, but return a generic message to the client
-		log.Printf("Failed to delete video and associated data: %v", err)
-		return utils.ErrorResponse(c, "Failed to delete video", fiber.StatusInternalServerError)
+		log.Printf("⚠️ Failed to index video in Meilisearch: %v", err)
+	} else {
+		log.Printf("✅ Video indexed in Meilisearch: ID %d", video.ID)
 	}
 
-	go func() {
-		if video.MinioKey != "" {
-			services.DeleteVideo(video.MinioKey)
-		}
-		if video.Thumbnail != "" {
-			services.DeleteVideo(video.Thumbnail)
-		}
-	}()
-
-	// Delete from database (soft delete)
-	if err := database.DB.Delete(&video).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to delete video record", fiber.StatusInternalServerError)
-	}
-
-	return utils.SuccessResponse(c, fiber.Map{
-		"message": "Video deleted successfully",
-	})
 }
 
-// UpdateVideo updates video metadata - PUT /api/v1/videos/:id
-func UpdateVideo(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(uint)
-	videoID := c.Params("id")
-
-	var video models.Video
-	if err := database.DB.First(&video, videoID).Error; err != nil {
-		return utils.ErrorResponse(c, "Video not found", fiber.StatusNotFound)
+// Updates a video's metadata in Meilisearch when the video is updated in the database.
+func UpdateVideoInMeilisearch(video models.Video) {
+	documents := []map[string]interface{}{
+		{
+			"id":          video.ID,
+			"title":       video.Title,
+			"description": video.Description,
+			"sport":       video.Sport,
+			"views":       video.Views,
+			"tags":        video.Tags,
+			"created_at":  video.CreatedAt.Unix(),
+		},
 	}
 
-	// Check ownership
-	if video.UserID != userID {
-		return utils.ErrorResponse(c, "You don't have permission to update this video", fiber.StatusForbidden)
+	_, err := config.MeiliClient.Index("videos").UpdateDocuments(documents, nil)
+	if err != nil {
+		log.Printf("⚠️ Failed to update video %d in Meilisearch: %v", video.ID, err)
+	} else {
+		log.Printf("✅ Updated video %d in Meilisearch", video.ID)
 	}
+}
 
-	// Parse request body
-	var updates struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Sport       string `json:"sport"`
+// Deletes a video from Meilisearch when the video is deleted from the database.
+func DeleteVideoFromMeilisearch(videoID uint) {
+	_, err := config.MeiliClient.Index("videos").DeleteDocument(fmt.Sprintf("%d", videoID), nil)
+	if err != nil {
+		log.Printf("⚠️ Failed to delete video %d from Meilisearch: %v", videoID, err)
+	} else {
+		log.Printf("✅ Deleted video %d from Meilisearch", videoID)
 	}
-
-	if err := c.BodyParser(&updates); err != nil {
-		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
-	}
-
-	// Update fields
-	if updates.Title != "" {
-		video.Title = updates.Title
-	}
-	if updates.Description != "" {
-		video.Description = updates.Description
-	}
-	if updates.Sport != "" {
-		video.Sport = updates.Sport
-	}
-
-	// Save updates
-	if err := database.DB.Save(&video).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to update video", fiber.StatusInternalServerError)
-	}
-
-	// Load relations
-	database.DB.Preload("User").First(&video, video.ID)
-
-	return utils.SuccessResponse(c, fiber.Map{
-		"message": "Video updated successfully",
-		"video":   video,
-	})
 }
