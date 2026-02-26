@@ -7,7 +7,7 @@ import (
 	"github.com/meilisearch/meilisearch-go"
 )
 
-var MeiliClient *meilisearch.Client
+var MeiliClient meilisearch.ServiceManager
 
 func InitMeilisearch() {
 	url := os.Getenv("MEILI_URL")
@@ -18,13 +18,12 @@ func InitMeilisearch() {
 		log.Fatal("Meilisearch configuration is missing. Please set MEILI_URL, MEILI_PORT, and MEILI_MASTER_KEY environment variables.")
 	}
 
-	MeiliClient = meilisearch.NewClient(meilisearch.ClientConfig{
-		Host:   url + ":" + port,
-		APIKey: apiKey,
-	})
+	host := url + ":" + port
+
+	MeiliClient = meilisearch.New(host, meilisearch.WithAPIKey(apiKey))
 
 	// Test the connection
-	version, err := MeiliClient.GetVersion()
+	version, err := MeiliClient.Version()
 	if err != nil {
 		log.Printf("Failed to connect to Meilisearch: %v", err)
 	} else {
@@ -39,13 +38,10 @@ func InitMeilisearch() {
 func CreateIndexes() {
 
 	// Videos index
-	MeiliClient.CreateIndex(&meilisearch.IndexConfig{
-		Uid:        "videos",
-		PrimaryKey: "id",
-	})
+	videosIndex := MeiliClient.Index("videos")
 
 	// Searchable fields
-	MeiliClient.Index("videos").UpdateSearchableAttributes(&[]string{
+	videosIndex.UpdateSearchableAttributes(&[]string{
 		"title",
 		"description",
 		"tags",
@@ -53,41 +49,38 @@ func CreateIndexes() {
 	})
 
 	// Filterable fields
-	MeiliClient.Index("videos").UpdateFilterableAttributes(&[]string{
+	videosIndex.UpdateFilterableAttributes(&[]interface{}{
 		"sport",
-		"duration",
+		"created_at",
 		"views",
 	})
 
 	// Sortable fields
-	MeiliClient.Index("videos").UpdateSortableAttributes(&[]string{
+	videosIndex.UpdateSortableAttributes(&[]string{
 		"created_at",
 		"views",
 		"likes",
 	})
 
 	// News index
-	MeiliClient.CreateIndex(&meilisearch.IndexConfig{
-		Uid:        "news",
-		PrimaryKey: "id",
-	})
+	newsIndex := MeiliClient.Index("news")
 
 	// Searchable fields
-	MeiliClient.Index("news").UpdateSearchableAttributes(&[]string{
+	newsIndex.UpdateSearchableAttributes(&[]string{
 		"title",
 		"description",
 		"source",
 	})
 
 	// Filterable fields
-	MeiliClient.Index("news").UpdateFilterableAttributes(&[]string{
+	newsIndex.UpdateFilterableAttributes(&[]interface{}{
 		"sport",
 		"source",
 		"published_at",
 	})
 
 	// Sortable fields
-	MeiliClient.Index("news").UpdateSortableAttributes(&[]string{
+	newsIndex.UpdateSortableAttributes(&[]string{
 		"published_at",
 	})
 
