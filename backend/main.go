@@ -78,6 +78,7 @@ func setupRoutes(app *fiber.App) {
 	auth := api.Group("/auth", middleware.AuthRateLimiter()) // /api/v1/auth
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
+	log.Println("✅ Auth routes registered")
 
 	// User routes
 	users := api.Group("/users")                                     // /api/v1/users
@@ -85,6 +86,7 @@ func setupRoutes(app *fiber.App) {
 	users.Put("/me", middleware.AuthMiddleware, routes.UpdateMyProfile)
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideos)
+	log.Println("✅ User routes registered")
 
 	// Video routes
 	videos := api.Group("/videos")
@@ -93,23 +95,22 @@ func setupRoutes(app *fiber.App) {
 	videos.Get("/:id", routes.GetVideo)
 	videos.Put("/:id", middleware.AuthMiddleware, routes.UpdateVideo)
 	videos.Delete("/:id", middleware.AuthMiddleware, routes.DeleteVideo)
+	log.Println("✅ Video routes registered")
 
 	// News routes
 	news := api.Group("/news")
 	news.Get("/", routes.GetNews)                    // List all news
 	news.Get("/:id", routes.GetNewsArticle)          // Get single article
 	news.Get("/sport/:sport", routes.GetNewsBySport) // Filter by sport
+	log.Println("✅ News routes registered")
 
 	// Admin routes (logs for debugging and verification)
-	log.Println("📋 Registering admin routes...")
 	adminAuth := api.Group("/admin", middleware.AuthMiddleware, middleware.AdminOnly)
-	log.Println("✅ Registered: POST /admin/feeds")
 	adminAuth.Post("/feeds", routes.CreateRSSFeed)
-	log.Println("✅ Registered: GET /admin/feeds")
 	adminAuth.Get("/feeds", routes.GetRSSFeeds)
 	adminAuth.Put("/feeds/:id", routes.UpdateRSSFeed)
 	adminAuth.Delete("/feeds/:id", routes.DeleteRSSFeed)
 	adminAuth.Post("/feeds/:id/sync", routes.SyncRSSFeed)
 	adminAuth.Post("/feeds/sync-all", routes.SyncAllFeeds)
-	log.Println("✅ All admin routes registered")
+	log.Println("✅ Admin routes registered")
 }
