@@ -42,16 +42,18 @@ services:
 
   meilisearch:
     image: getmeili/meilisearch:latest
-    container_name: gosport-search
-    environment: 
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+    container_name: gosport-meilisearch
+    restart: unless-stopped
     ports:
-      - "${MEILI_PORT}:7700"
+      - "${MEILI_PORT}:${MEILI_PORT}"
+    environment: 
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+      - MEILI_ENV=development
+      - MEILI_NO_ANALYTICS=true
     volumes:  
-      - meili_data:/meili_data
+      - meilisearch_data:/meilisearch_data
     networks:
       - gosport-network
-    restart: unless-stopped
     healthcheck:                                       
       test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
       interval: 10s
