@@ -18,6 +18,10 @@ type User struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // soft delete
 
+	// Subscription fields
+	SubscribersCount   uint `gorm:"default:0" json:"subscribers_count"`   // how many subscribers this user has
+	SubscriptionsCount uint `gorm:"default:0" json:"subscriptions_count"` // how many creators this user is subscribed to
+
 	// Relations
 	Videos        []Video        `gorm:"foreignKey:UserID" json:"videos,omitempty"`
 	Subscriptions []Subscription `gorm:"foreignKey: SubscriberID" json:"subscriptions,omitempty"`
