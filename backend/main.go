@@ -122,4 +122,12 @@ func setupRoutes(app *fiber.App) {
 	search.Get("/videos", routes.SearchVideos)
 	search.Get("/news", routes.SearchNews)
 	log.Println("✅ Search routes registered")
+
+	// Subscription routes
+	users.Post("/:userId/subscribe", middleware.AuthMiddleware, routes.Subscribe)
+	users.Delete("/:userId/unsubscribe", middleware.AuthMiddleware, routes.Unsubscribe)
+	users.Get("/:userId/subscription", middleware.AuthMiddleware, routes.CheckSubscription)
+	users.Get("/subscriptions", middleware.AuthMiddleware, routes.GetSubscriptions)
+	users.Get("/:userId/subscribers", middleware.AuthMiddleware, routes.GetSubscribers)
+	log.Println("✅ Subscription routes registered")
 }
