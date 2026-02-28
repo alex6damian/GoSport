@@ -24,9 +24,9 @@ type Video struct {
 	Status   string `gorm:"default:pending" json:"status"` // pending, processing, ready, failed
 
 	// Stats
-	Views     int    `gorm:"default:0;index" json:"views"`
-	Likes     int    `gorm:"default:0;index" json:"likes"`
-	Favorites int    `gorm:"default:0;index" json:"favorites"`
+	Views     int    `gorm:"column:views;default:0;index" json:"views_count"`
+	Likes     int    `gorm:"column:likes;default:0;index" json:"likes_count"`
+	Favorites int    `gorm:"column:favorites;default:0;index" json:"favorites_count"`
 	Tags      string `json:"tags"` // comma-separated tags for search
 
 	CreatedAt time.Time `json:"created_at"`

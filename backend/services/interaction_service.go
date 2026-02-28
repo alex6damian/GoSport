@@ -161,20 +161,47 @@ func (s *VideoInteractionService) UpdateWatchProgress(userID uint, videoID uint,
 
 // GetWatchHistory returns user's watch history
 func (s *VideoInteractionService) GetWatchHistory(userID uint, limit, offset int) ([]models.Video, error) {
-	var videos []models.Video
-
+	// Get ordered video IDs
+	var videoIDs []uint
 	err := s.DB.Table("video_views").
-		Select("DISTINCT ON (videos.id) videos.*, video_views.created_at as last_watched").
-		Joins("JOIN videos ON video_views.video_id = videos.id").
-		Joins("JOIN users ON videos.user_id = users.id").
-		Where("video_views.user_id = ?", userID).
-		Where("videos.deleted_at IS NULL").
-		Order("video_views.created_at DESC").
+		Select("video_id").
+		Where("user_id = ?", userID).
+		Group("video_id").
+		Order("MAX(created_at) DESC").
 		Limit(limit).
 		Offset(offset).
-		Scan(&videos).Error
+		Pluck("video_id", &videoIDs).Error
 
-	return videos, err
+	if err != nil || len(videoIDs) == 0 {
+		return []models.Video{}, err
+	}
+
+	// Get videos maintaining order
+	var videos []models.Video
+	err = s.DB.
+		Where("id IN ?", videoIDs).
+		Preload("User").
+		Find(&videos).Error
+
+	if err != nil {
+		return []models.Video{}, err
+	}
+
+	// Reorder to match watch history order
+	videoMap := make(map[uint]models.Video)
+	for _, v := range videos {
+		videoMap[v.ID] = v
+	}
+
+	orderedVideos := make([]models.Video, 0, len(videoIDs))
+	for _, id := range videoIDs {
+		if video, ok := videoMap[id]; ok {
+			orderedVideos = append(orderedVideos, video)
+		}
+	}
+
+	log.Printf("Returning %d videos", len(orderedVideos))
+	return orderedVideos, nil
 }
 
 // ToggleFavorite adds or removes from favorites
@@ -219,20 +246,46 @@ func (s *VideoInteractionService) IsFavorited(userID, videoID uint) bool {
 
 // GetFavorites returns user's favorite videos
 func (s *VideoInteractionService) GetFavorites(userID uint, limit, offset int) ([]models.Video, error) {
-	var videos []models.Video
-
+	// Get ordered video IDs
+	var videoIDs []uint
 	err := s.DB.Table("favorites").
-		Select("videos.*, favorites.created_at as favorited_at").
-		Joins("JOIN videos ON favorites.video_id = videos.id").
-		Joins("JOIN users ON videos.user_id = users.id").
-		Where("favorites.user_id = ?", userID).
-		Where("videos.deleted_at IS NULL").
-		Order("favorites.created_at DESC").
+		Select("video_id").
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
-		Scan(&videos).Error
+		Pluck("video_id", &videoIDs).Error
 
-	return videos, err
+	if err != nil || len(videoIDs) == 0 {
+		return []models.Video{}, err
+	}
+
+	// Get videos maintaining order
+	var videos []models.Video
+	err = s.DB.
+		Where("id IN ?", videoIDs).
+		Preload("User").
+		Find(&videos).Error
+
+	if err != nil {
+		return []models.Video{}, err
+	}
+
+	// Reorder to match favorites order
+	videoMap := make(map[uint]models.Video)
+	for _, v := range videos {
+		videoMap[v.ID] = v
+	}
+
+	orderedVideos := make([]models.Video, 0, len(videoIDs))
+	for _, id := range videoIDs {
+		if video, ok := videoMap[id]; ok {
+			orderedVideos = append(orderedVideos, video)
+		}
+	}
+
+	log.Printf("✅ Returning %d videos", len(orderedVideos))
+	return orderedVideos, nil
 }
 
 // GetVideoStats returns aggregated stats for a video

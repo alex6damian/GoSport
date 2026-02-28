@@ -87,6 +87,8 @@ func setupRoutes(app *fiber.App) {
 	users := api.Group("/users")                                     // /api/v1/users
 	users.Get("/me", middleware.AuthMiddleware, routes.GetMyProfile) // Middleware acts first as authentication gate
 	users.Put("/me", middleware.AuthMiddleware, routes.UpdateMyProfile)
+	users.Get("/me/history", middleware.AuthMiddleware, routes.GetWatchHistory)
+	users.Get("/me/favorites", middleware.AuthMiddleware, routes.GetFavorites)
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideos)
 	log.Println("✅ User routes registered")
@@ -99,6 +101,17 @@ func setupRoutes(app *fiber.App) {
 	videos.Put("/:id", middleware.AuthMiddleware, routes.UpdateVideo)
 	videos.Delete("/:id", middleware.AuthMiddleware, routes.DeleteVideo)
 	log.Println("✅ Video routes registered")
+
+	// Video interaction routes
+	videos.Post("/:id/view", routes.TrackView) // Public - track anonymous views
+	videos.Post("/:id/progress", middleware.AuthMiddleware, routes.UpdateWatchProgress)
+	videos.Post("/:id/like", middleware.AuthMiddleware, routes.ToggleLike)
+	videos.Get("/:id/like", routes.CheckIfLiked)
+	videos.Get("/:id/likes", routes.GetVideoLikes)
+	videos.Post("/:id/favorite", middleware.AuthMiddleware, routes.ToggleFavorite)
+	videos.Get("/:id/favorite", routes.CheckIfFavorited)
+	videos.Get("/:id/stats", routes.GetVideoStats)
+	log.Println("✅ Video interaction routes registered")
 
 	// News routes
 	news := api.Group("/news")
