@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/alex6damian/GoSport/pkg/database"
 	"github.com/alex6damian/GoSport/pkg/models"
@@ -12,12 +14,33 @@ type SubscriptionService struct {
 	DB *gorm.DB
 }
 
+// UserSubscriptionInfo represents a clean response struct - only user info
+type UserSubscriptionInfo struct {
+	ID                 uint      `json:"id"`
+	Username           string    `json:"username"`
+	Email              string    `json:"email"`
+	Avatar             string    `json:"avatar"`
+	SubscribersCount   int       `json:"subscribers_count"`
+	SubscriptionsCount int       `json:"subscriptions_count"`
+	SubscribedAt       time.Time `json:"subscribed_at"`
+}
+
 func NewSubscriptionService() *SubscriptionService {
+	if database.DB == nil {
+		log.Fatal("❌ Database not initialized when creating SubscriptionService")
+	}
+
+	log.Println("✅ SubscriptionService created")
 	return &SubscriptionService{DB: database.DB}
 }
 
 // Subscribe creates a new subscription
 func (s *SubscriptionService) Subscribe(subscriberID, creatorID uint) error {
+	// DB check
+	if s.DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
 	// Check if already subscribed
 	if s.IsSubscribed(subscriberID, creatorID) {
 		return fmt.Errorf("already subscribed")
@@ -42,6 +65,8 @@ func (s *SubscriptionService) Subscribe(subscriberID, creatorID uint) error {
 	// Update counts
 	s.DB.Model(&models.User{}).Where("id = ?", creatorID).
 		UpdateColumn("subscribers_count", gorm.Expr("subscribers_count + 1"))
+	s.DB.Model(&models.User{}).Where("id = ?", subscriberID).
+		UpdateColumn("subscriptions_count", gorm.Expr("subscriptions_count + 1"))
 
 	return nil
 }
@@ -58,6 +83,8 @@ func (s *SubscriptionService) Unsubscribe(subscriberID, creatorID uint) error {
 	// Update counts
 	s.DB.Model(&models.User{}).Where("id = ?", creatorID).
 		UpdateColumn("subscribers_count", gorm.Expr("subscribers_count - 1"))
+	s.DB.Model(&models.User{}).Where("id = ?", subscriberID).
+		UpdateColumn("subscriptions_count", gorm.Expr("subscriptions_count - 1"))
 
 	return nil
 }
@@ -81,21 +108,45 @@ func (s *SubscriptionService) GetSubscriberCount(creatorID uint) int64 {
 }
 
 // GetSubscriptions returns all subscriptions for a user
-func (s *SubscriptionService) GetSubscriptions(subscriberID uint) ([]models.Subscription, error) {
-	var subscriptions []models.Subscription
-	err := s.DB.Where("subscriber_id = ?", subscriberID).
-		Preload("Creator").
-		Order("created_at DESC").
-		Find(&subscriptions).Error
-	return subscriptions, err
+func (s *SubscriptionService) GetSubscriptions(subscriberID uint) ([]UserSubscriptionInfo, error) {
+	var result []UserSubscriptionInfo
+
+	err := s.DB.Table("subscriptions").
+		Select(`
+			users.id,
+			users.username,
+			users.email,
+			users.avatar,
+			users.subscribers_count,
+			users.subscriptions_count,
+			subscriptions.created_at as subscribed_at
+		`).
+		Joins("JOIN users ON subscriptions.creator_id = users.id").
+		Where("subscriptions.subscriber_id = ?", subscriberID).
+		Where("users.deleted_at IS NULL").
+		Order("subscriptions.created_at DESC").
+		Scan(&result).Error
+
+	return result, err
 }
 
 // GetSubscribers returns all subscribers for a creator
-func (s *SubscriptionService) GetSubscribers(creatorID uint) ([]models.Subscription, error) {
-	var subscribers []models.Subscription
-	err := s.DB.Where("creator_id = ?", creatorID).
-		Preload("Subscriber").
-		Order("created_at DESC").
-		Find(&subscribers).Error
-	return subscribers, err
+func (s *SubscriptionService) GetSubscribers(creatorID uint) ([]UserSubscriptionInfo, error) {
+	var result []UserSubscriptionInfo
+	err := s.DB.Table("subscriptions").
+		Select(`
+			users.id,
+			users.username,
+			users.email,
+			users.avatar,
+			users.subscribers_count,
+			users.subscriptions_count,
+			subscriptions.created_at as subscribed_at
+		`).
+		Joins("JOIN users ON subscriptions.subscriber_id = users.id").
+		Where("subscriptions.creator_id = ?", creatorID).
+		Where("users.deleted_at IS NULL").
+		Order("subscriptions.created_at DESC").
+		Scan(&result).Error
+	return result, err
 }

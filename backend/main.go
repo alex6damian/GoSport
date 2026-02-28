@@ -124,10 +124,10 @@ func setupRoutes(app *fiber.App) {
 	log.Println("✅ Search routes registered")
 
 	// Subscription routes
+	users.Get("/me/subscriptions", middleware.AuthMiddleware, routes.GetSubscriptions) // /me to avoid conflicts
 	users.Post("/:userId/subscribe", middleware.AuthMiddleware, routes.Subscribe)
 	users.Delete("/:userId/unsubscribe", middleware.AuthMiddleware, routes.Unsubscribe)
 	users.Get("/:userId/subscription", middleware.AuthMiddleware, routes.CheckSubscription)
-	users.Get("/subscriptions", middleware.AuthMiddleware, routes.GetSubscriptions)
-	users.Get("/:userId/subscribers", middleware.AuthMiddleware, routes.GetSubscribers)
+	users.Get("/:userId/subscribers", routes.GetSubscribers) // No auth required to view subscribers list
 	log.Println("✅ Subscription routes registered")
 }

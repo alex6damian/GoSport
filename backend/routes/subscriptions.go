@@ -6,7 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-var subService = services.NewSubscriptionService()
+// Lazy initialization of the subscription service
+func getSubscriptionService() *services.SubscriptionService {
+	return services.NewSubscriptionService()
+}
 
 // POST /api/v1/users/:userId/subscribe - Subscribes the authenticated user to the specified creator
 func Subscribe(c *fiber.Ctx) error {
@@ -20,6 +23,8 @@ func Subscribe(c *fiber.Ctx) error {
 	if uint(creatorID) == subscriberID {
 		return utils.ErrorResponse(c, "Cannot subscribe to yourself", fiber.StatusBadRequest)
 	}
+
+	subService := getSubscriptionService()
 
 	err = subService.Subscribe(subscriberID, uint(creatorID))
 	if err != nil {
@@ -41,6 +46,8 @@ func Unsubscribe(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "Invalid user ID", fiber.StatusBadRequest)
 	}
 
+	subService := getSubscriptionService()
+
 	err = subService.Unsubscribe(subscriberID, uint(creatorID))
 	if err != nil {
 		return utils.ErrorResponse(c, err.Error(), fiber.StatusNotFound)
@@ -57,6 +64,8 @@ func CheckSubscription(c *fiber.Ctx) error {
 	subscriberID := c.Locals("userID").(uint)
 	creatorID, _ := c.ParamsInt("userId")
 
+	subService := getSubscriptionService()
+
 	isSubscribed := subService.IsSubscribed(subscriberID, uint(creatorID))
 
 	return c.JSON(fiber.Map{
@@ -69,6 +78,8 @@ func CheckSubscription(c *fiber.Ctx) error {
 func GetSubscriptions(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 
+	subService := getSubscriptionService()
+
 	subscriptions, err := subService.GetSubscriptions(userID)
 	if err != nil {
 		return utils.ErrorResponse(c, "Failed to fetch subscriptions", fiber.StatusInternalServerError)
@@ -77,6 +88,7 @@ func GetSubscriptions(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    subscriptions,
+		"count":   len(subscriptions),
 	})
 }
 
@@ -87,6 +99,8 @@ func GetSubscribers(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "Invalid user ID", fiber.StatusBadRequest)
 	}
 
+	subService := getSubscriptionService()
+
 	subscribers, err := subService.GetSubscribers(uint(creatorID))
 	if err != nil {
 		return utils.ErrorResponse(c, "Failed to fetch subscribers", fiber.StatusInternalServerError)
@@ -95,5 +109,6 @@ func GetSubscribers(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    subscribers,
+		"count":   len(subscribers),
 	})
 }
