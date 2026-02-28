@@ -248,10 +248,8 @@ Go structs that map to database tables:
 ./testing\ scripts/video_upload_test.sh 
 ```
 
-## TODO(Subscriptions):
-- Define subscriptions model
-- Update user/video models
-- Define routes
-- Feed algorithm routes
-- Update main routes
-- Testing script
+## TODO:
+- Comments system
+- Notifications system
+- Custom feed
+- Update guidance map
