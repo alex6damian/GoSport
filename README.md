@@ -85,7 +85,7 @@ The system is built using a modular monolithic architecture (with the possibilit
 
 - ### Content & Discovery
 - ✅ RSS news aggregation
-- ⬜ Meilisearch integration
+- ✅ Meilisearch integration
 - ⬜ Subscriptions
 - ⬜ Feed algorithm
 
