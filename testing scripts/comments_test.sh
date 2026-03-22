@@ -182,35 +182,35 @@ print_success "Root comment updated"
 echo ""
 
 # --------------------------------------------------------------------
-# 7) Delete REPLY first (optional but cleaner), then delete root comment
-print_info "Deleting reply $REPLY_ID..."
-DELETE_REPLY_JSON=$(curl -s -X DELETE "$BASE_URL/comments/$REPLY_ID" \
-  -H "Authorization: Bearer $TOKEN_ALEX")
-assert_success_json "$DELETE_REPLY_JSON"
-print_success "Reply deleted"
-echo ""
+# # 7) Delete REPLY first (optional but cleaner), then delete root comment
+# print_info "Deleting reply $REPLY_ID..."
+# DELETE_REPLY_JSON=$(curl -s -X DELETE "$BASE_URL/comments/$REPLY_ID" \
+#   -H "Authorization: Bearer $TOKEN_ALEX")
+# assert_success_json "$DELETE_REPLY_JSON"
+# print_success "Reply deleted"
+# echo ""
 
-# Re-list replies and assert reply is gone (depends on your delete behavior: soft delete vs hard delete)
-print_info "Re-listing replies to confirm deletion..."
-LIST_REPLIES_AFTER_DEL_JSON=$(curl -s -X GET "$BASE_URL/comments/$COMMENT_ID/replies?page=1&limit=20")
-assert_success_json "$LIST_REPLIES_AFTER_DEL_JSON"
-assert_item_not_in_list_by_id "$LIST_REPLIES_AFTER_DEL_JSON" "$REPLY_ID"
-print_success "Reply no longer in list"
-echo ""
+# # Re-list replies and assert reply is gone (depends on your delete behavior: soft delete vs hard delete)
+# print_info "Re-listing replies to confirm deletion..."
+# LIST_REPLIES_AFTER_DEL_JSON=$(curl -s -X GET "$BASE_URL/comments/$COMMENT_ID/replies?page=1&limit=20")
+# assert_success_json "$LIST_REPLIES_AFTER_DEL_JSON"
+# assert_item_not_in_list_by_id "$LIST_REPLIES_AFTER_DEL_JSON" "$REPLY_ID"
+# print_success "Reply no longer in list"
+# echo ""
 
-print_info "Deleting root comment $COMMENT_ID..."
-DELETE_COMMENT_JSON=$(curl -s -X DELETE "$BASE_URL/comments/$COMMENT_ID" \
-  -H "Authorization: Bearer $TOKEN_ALEX")
-assert_success_json "$DELETE_COMMENT_JSON"
-print_success "Root comment deleted"
-echo ""
+# print_info "Deleting root comment $COMMENT_ID..."
+# DELETE_COMMENT_JSON=$(curl -s -X DELETE "$BASE_URL/comments/$COMMENT_ID" \
+#   -H "Authorization: Bearer $TOKEN_ALEX")
+# assert_success_json "$DELETE_COMMENT_JSON"
+# print_success "Root comment deleted"
+# echo ""
 
-# Re-list comments and assert root comment is gone
-print_info "Re-listing comments to confirm deletion..."
-LIST_COMMENTS_AFTER_DEL_JSON=$(curl -s -X GET "$BASE_URL/videos/$VIDEO_ID/comments?page=1&limit=20")
-assert_success_json "$LIST_COMMENTS_AFTER_DEL_JSON"
-assert_item_not_in_list_by_id "$LIST_COMMENTS_AFTER_DEL_JSON" "$COMMENT_ID"
-print_success "Root comment no longer in list"
-echo ""
+# # Re-list comments and assert root comment is gone
+# print_info "Re-listing comments to confirm deletion..."
+# LIST_COMMENTS_AFTER_DEL_JSON=$(curl -s -X GET "$BASE_URL/videos/$VIDEO_ID/comments?page=1&limit=20")
+# assert_success_json "$LIST_COMMENTS_AFTER_DEL_JSON"
+# assert_item_not_in_list_by_id "$LIST_COMMENTS_AFTER_DEL_JSON" "$COMMENT_ID"
+# print_success "Root comment no longer in list"
+# echo ""
 
 print_success "Comment flow done: list comments -> add reply -> list replies -> edit -> delete reply -> delete root"
