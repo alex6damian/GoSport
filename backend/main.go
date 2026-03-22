@@ -78,7 +78,7 @@ func setupRoutes(app *fiber.App) {
 	api := app.Group("/api/v1")
 
 	// Auth routes
-	auth := api.Group("/auth", middleware.AuthRateLimiter()) // /api/v1/auth
+	auth := api.Group("/auth") //, middleware.AuthRateLimiter()) // /api/v1/auth ADD BACK AFTER DONE TESTING
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
 	log.Println("✅ Auth routes registered")
@@ -143,4 +143,15 @@ func setupRoutes(app *fiber.App) {
 	users.Get("/:userId/subscription", middleware.AuthMiddleware, routes.CheckSubscription)
 	users.Get("/:userId/subscribers", routes.GetSubscribers) // No auth required to view subscribers list
 	log.Println("✅ Subscription routes registered")
+
+	// Comment routes
+	comments := api.Group("/comments")
+	videos.Post("/:id/comments", middleware.AuthMiddleware, routes.AddComment)
+	videos.Get("/:id/comments", routes.ListVideoComments)
+	comments.Put("/:id", middleware.AuthMiddleware, routes.UpdateComment)
+	comments.Delete("/:id", middleware.AuthMiddleware, routes.DeleteComment)
+	comments.Get("/:id/replies", routes.ListCommentReplies)
+	comments.Post("/:id/replies", middleware.AuthMiddleware, routes.AddReply)
+
+	log.Println("✅ Comment routes registered")
 }

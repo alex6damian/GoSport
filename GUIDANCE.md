@@ -18,10 +18,15 @@ backend/                       # 🔐 High-performance backend serving as the co
 │   ├── auth.go                # 🔐 Register & Login handlers (POST /auth/register, /auth/login)
 |   ├── meilisearch.go         # 🕵🏻 Videos/News search routes (GET /search/videos, /search/news)
 │   ├── news.go                # 🗞️ News (GET all news, filtered news or single article)
+│   ├── subscriptions.go 
 │   ├── users.go               # 👤 User CRUD handlers (GET/PUT /users/me, users/:username, users/:username/videos)
+│   ├── video_interactions.go  # 
 │   └── videos.go              # 🎬 Video CRUD handlers (POST /videos/upload, GET /videos, GET /videos/:id, PUT /videos/:id, DELETE /videos/:id)
 │
 ├── services/                  # 🔧 Business logic services
+│   ├── interaction_service.go
+│   ├── rss_service.go
+│   ├── subscription_service.go
 │   └── video_service.go       # 📹 Video upload/download/delete operations with MinIO
 │
 └── utils/                     # 🧰 Helper functions (reusable utilities)
@@ -53,6 +58,8 @@ pkg/                           # 📦 Shared packages (used by backend + workers
     ├── rss_feed.go            # 📰 RSS Feed Model (url, sport, language)
     ├── subscription.go        # 🔔 Subscription Model (subscriber_id, creator_id) 
     ├── user.go                # 👤 User Model (id, username, email, password, role, avatar)
+    ├── video_like.go          # Video Likes (user-video)
+    ├── video_view.go          # Video Views (user-video)
     └── video.go               # 🎥 Video Model (title, description, sport, minio_key, file_size, status, views, likes)
 
 

@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -77,4 +78,14 @@ func ValidateStrongPassword(fl validator.FieldLevel) bool {
 	hasNumber := regexp.MustCompile(`[0-9]`).MatchString(password)
 
 	return hasUpper && hasNumber
+}
+
+// ValidateComment validates comments ("comment" tag)
+func ValidateComment(fl validator.FieldLevel) bool {
+	comment := fl.Field().String()
+	comment = strings.TrimSpace(comment)
+	if comment == "" || len(comment) > 2000 {
+		return false
+	}
+	return true
 }

@@ -34,5 +34,5 @@ type Video struct {
 
 	// Relations
 	User     User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Comments []Comment `gorm:"foreignKey:VideoID" json:"comments,omitempty"`
+	Comments []Comment `gorm:"foreignKey:VideoID" json:"-"`
 }
