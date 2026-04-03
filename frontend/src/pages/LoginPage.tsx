@@ -13,10 +13,10 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const data = await login(email, password);
-      // Assuming the token is in data.token
-      localStorage.setItem('token', data.token);
-      navigate('/'); // Redirect to homepage on successful login
+      const response = await login(email, password);
+      // The token is nested in response.data.token
+      localStorage.setItem('token', response.data.token);
+      navigate('/me'); // Redirect to homepage on successful login
     } catch (err) {
       setError('Invalid email or password. Please try again.');
       console.error(err);

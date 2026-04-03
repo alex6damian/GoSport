@@ -123,7 +123,7 @@ func Login(c *fiber.Ctx) error {
 
 	if err := utils.ValidateStruct(req); err != nil {
 		// convert validation error to a map[string]string expected by ValidationErrorResponse
-		return utils.ValidationErrorResponse(c, map[string]string{"error": err.Error()})
+		return utils.ErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	// Find user by email

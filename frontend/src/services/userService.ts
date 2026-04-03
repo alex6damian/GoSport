@@ -7,7 +7,7 @@ export const getMyProfile = async () => {
 };
 
 // PUT /api/v1/users/me
-export const updateMyProfile = async (profileData: any) => {
+export const updateUserProfile = async (profileData: any) => {
   const response = await api.put('/users/me', profileData);
   return response.data;
 };

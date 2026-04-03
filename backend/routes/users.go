@@ -11,7 +11,8 @@ import (
 
 // Profile update structure
 type UpdateProfileRequest struct {
-	Username string `json:"username" validate:"omitempty,username_pattern,min=3,max=30"`
+	Username string `json:"username" validate:"omitempty,username_pattern"`
+	Email    string `json:"email" validate:"omitempty,email"`
 	Avatar   string `json:"avatar" validate:"omitempty,url"`
 }
 
@@ -22,8 +23,8 @@ type UserProfileResponse struct {
 	Email            string `json:"email"`
 	Role             string `json:"role"`
 	Avatar           string `json:"avatar,omitempty"`
-	VideosCount      int64  `json:"videos_count,omitempty"`
-	SubscribersCount int64  `json:"subscribers_count,omitempty"`
+	VideosCount      int64  `json:"videos_count"`
+	SubscribersCount int64  `json:"subscribers_count"`
 	CreatedAt        string `json:"created_at"`
 }
 
@@ -69,12 +70,12 @@ func UpdateMyProfile(c *fiber.Ctx) error {
 
 	var req UpdateProfileRequest
 	if err := c.BodyParser(&req); err != nil {
-		return utils.ValidationErrorResponse(c, map[string]string{"body": "Invalid request body"})
+		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
 	}
 
 	// Validate input
 	if err := utils.ValidateStruct(req); err != nil {
-		return utils.ValidationErrorResponse(c, map[string]string{"validation": err.Error()})
+		return utils.ErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	var user models.User
@@ -90,6 +91,15 @@ func UpdateMyProfile(c *fiber.Ctx) error {
 			return utils.ErrorResponse(c, "Username already taken", fiber.StatusBadRequest)
 		}
 		user.Username = req.Username
+	}
+
+	if req.Email != "" {
+		// Check if email is taken
+		var existingUser models.User
+		if err := database.DB.Where("email = ? AND id != ?", req.Email, userID).First(&existingUser).Error; err == nil {
+			return utils.ErrorResponse(c, "Email already taken", fiber.StatusBadRequest)
+		}
+		user.Email = req.Email
 	}
 
 	if req.Avatar != "" {
