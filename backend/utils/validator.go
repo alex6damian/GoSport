@@ -47,9 +47,9 @@ func formatValidationError(e validator.FieldError) error {
 	case "max":
 		return fmt.Errorf("%s must be at most %s characters", field, e.Param())
 	case "username_pattern":
-		return fmt.Errorf("%s must start with a letter and can only contain letters, numbers, underscores and dashes", field)
+		return fmt.Errorf("%s must start with a letter and can only contain letters, numbers, underscores and dashes(min 3, max 20)", field)
 	case "strong_password":
-		return fmt.Errorf("%s must be at least 8 characters with at least one uppercase letter and one number", field)
+		return fmt.Errorf("%s must be at least 10 characters with at least one uppercase letter and one number", field)
 	case "oneof":
 		return fmt.Errorf("%s must be one of: %s", field, e.Param())
 	case "url":
@@ -62,6 +62,9 @@ func formatValidationError(e validator.FieldError) error {
 // ValidateUsername validates username pattern ("username_pattern" tag)
 func ValidateUsername(fl validator.FieldLevel) bool {
 	username := fl.Field().String()
+	if len(username) < 3 || len(username) > 20 {
+		return false
+	}
 	matched, _ := regexp.MatchString(`^[a-zA-Z][a-zA-Z0-9_-]*$`, username)
 	return matched
 }
@@ -70,7 +73,7 @@ func ValidateUsername(fl validator.FieldLevel) bool {
 func ValidateStrongPassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
 
-	if len(password) < 8 {
+	if len(password) < 10 {
 		return false
 	}
 

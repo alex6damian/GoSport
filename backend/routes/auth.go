@@ -10,9 +10,9 @@ import (
 
 // RegisterRequest represents the expected payload for user registration
 type RegisterRequest struct {
-	Username string `json:"username" validate:"required,min=3,max=30,username_pattern"`
+	Username string `json:"username" validate:"required,username_pattern"`
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8,strong_password"`
+	Password string `json:"password" validate:"required,strong_password"`
 	Role     string `json:"role" validate:"omitempty,oneof=user admin"`
 }
 
@@ -49,8 +49,7 @@ func Register(c *fiber.Ctx) error {
 
 	// All validation in one call
 	if err := utils.ValidateStruct(req); err != nil {
-		// Convert validation error to a map[string]string expected by ValidationErrorResponse
-		return utils.ValidationErrorResponse(c, map[string]string{"error": err.Error()})
+		return utils.ErrorResponse(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	// Set default role
