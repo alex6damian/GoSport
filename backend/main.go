@@ -152,6 +152,11 @@ func setupRoutes(app *fiber.App) {
 	comments.Delete("/:id", middleware.AuthMiddleware, routes.DeleteComment)
 	comments.Get("/:id/replies", routes.ListCommentReplies)
 	comments.Post("/:id/replies", middleware.AuthMiddleware, routes.AddReply)
-
 	log.Println("✅ Comment routes registered")
+
+	// Feed routes
+	feed := api.Group("/feed")
+	feed.Get("/", middleware.AuthMiddleware, routes.GetFeed)
+	log.Println("✅ Feed routes registered")
+
 }
