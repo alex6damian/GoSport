@@ -16,6 +16,7 @@ WORKDIR /src/worker/video_worker
 
 # Download dependencies for video_worker
 RUN go mod download
+RUN go mod tidy
 
 # Copy the rest of the source code
 WORKDIR /src

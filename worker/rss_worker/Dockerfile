@@ -17,6 +17,7 @@ WORKDIR /src/worker/rss_worker
 
 # Download dependencies for rss_worker
 RUN go mod download
+RUN go mod tidy
 
 # Copy the rest of the source code
 WORKDIR /src

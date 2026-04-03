@@ -1,3 +1,4 @@
+// backend/services/rss_service.go
 package services
 
 import (
@@ -10,6 +11,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"gorm.io/gorm"
 
+	"github.com/alex6damian/GoSport/pkg/config"
 	"github.com/alex6damian/GoSport/pkg/models"
 )
 
@@ -37,7 +39,7 @@ func (s *RSSService) FetchAndStore(feedID uint) error {
 		return fmt.Errorf("feed is not active")
 	}
 
-	log.Printf("Syncing feed: %s (%s)", feed.Name, feed.URL)
+	log.Printf("📡 Syncing feed: %s (%s)", feed.Name, feed.URL)
 
 	// Parse RSS feed
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -55,22 +57,44 @@ func (s *RSSService) FetchAndStore(feedID uint) error {
 	// Process articles
 	newArticles := 0
 	for _, item := range rssFeed.Items {
-		article := s.convertToArticle(item, &feed)
+		article := s.ConvertToArticle(item, &feed)
 
 		// Check if article exists
 		var existing models.NewsArticle
 		err := s.DB.Where("source_url = ?", article.SourceURL).First(&existing).Error
+
 		if err == nil {
-			continue // Article already exists, skip
+			// Article exists - check if content changed
+			if existing.Title != article.Title || existing.Content != article.Content {
+				// Update existing article
+				existing.Title = article.Title
+				existing.Content = article.Content
+				existing.Summary = article.Summary
+				existing.ImageURL = article.ImageURL
+
+				if err := s.DB.Save(&existing).Error; err != nil {
+					log.Printf("⚠️ Failed to update article: %v", err)
+					continue
+				}
+
+				// Update in Meilisearch
+				go s.updateArticleInMeilisearch(existing)
+				log.Printf("🔄 Updated article: %s", existing.Title)
+			}
+			continue // Skip to next article
 		}
 
-		// Save new article
+		// Save new article to database
 		if err := s.DB.Create(&article).Error; err != nil {
-			log.Printf("Failed to save article: %v", err)
+			log.Printf("⚠️ Failed to save article: %v", err)
 			continue
 		}
 
+		// ✅ Index new article to Meilisearch
+		go s.IndexArticleToMeilisearch(article)
+
 		newArticles++
+		log.Printf("✅ New article: %s", article.Title)
 	}
 
 	// Update feed metadata
@@ -80,12 +104,12 @@ func (s *RSSService) FetchAndStore(feedID uint) error {
 		"article_count": gorm.Expr("article_count + ?", newArticles),
 	})
 
-	log.Printf("Finished syncing feed: %s, new articles: %d", feed.Name, newArticles)
+	log.Printf("✅ Finished syncing feed: %s, new articles: %d", feed.Name, newArticles)
 	return nil
 }
 
-func (s *RSSService) convertToArticle(item *gofeed.Item, feed *models.RSSFeed) models.NewsArticle {
-
+// Converts a gofeed.Item to our NewsArticle model
+func (s *RSSService) ConvertToArticle(item *gofeed.Item, feed *models.RSSFeed) models.NewsArticle {
 	publishedAt := time.Now()
 	if item.PublishedParsed != nil {
 		publishedAt = *item.PublishedParsed
@@ -138,17 +162,78 @@ func (s *RSSService) SyncAllFeeds() error {
 		return err
 	}
 
-	log.Printf("Starting sync for %d feeds", len(feeds))
+	log.Printf("🔄 Starting sync for %d feeds", len(feeds))
 
 	for _, feed := range feeds {
 		if err := s.FetchAndStore(feed.ID); err != nil {
-			log.Printf("Error syncing feed %s: %v", feed.Name, err)
+			log.Printf("⚠️ Error syncing feed %s: %v", feed.Name, err)
 		}
-		// Smal delay between feeds
+		// Small delay between feeds
 		time.Sleep(2 * time.Second)
 	}
 
+	log.Println("✅ All feeds synced")
 	return nil
+}
+
+// Index new article to Meilisearch
+func (s *RSSService) IndexArticleToMeilisearch(article models.NewsArticle) {
+	if config.MeiliClient == nil {
+		log.Println("⚠️ Meilisearch client not initialized")
+		return
+	}
+
+	documents := []map[string]interface{}{
+		{
+			"id":           article.ID,
+			"title":        article.Title,
+			"summary":      article.Summary,
+			"content":      article.Content,
+			"sport":        article.Sport,
+			"source":       article.Source,
+			"source_url":   article.SourceURL,
+			"image_url":    article.ImageURL,
+			"author":       article.Author,
+			"published_at": article.PublishedAt.Unix(),
+		},
+	}
+
+	_, err := config.MeiliClient.Index("news").AddDocuments(documents, nil)
+	if err != nil {
+		log.Printf("⚠️ Failed to index article %d to Meilisearch: %v", article.ID, err)
+	} else {
+		log.Printf("🔍 Indexed article %d to Meilisearch", article.ID)
+	}
+}
+
+// Update existing article in Meilisearch
+func (s *RSSService) updateArticleInMeilisearch(article models.NewsArticle) {
+	if config.MeiliClient == nil {
+		log.Println("⚠️ Meilisearch client not initialized")
+		return
+	}
+
+	documents := []map[string]interface{}{
+		{
+			"id":           article.ID,
+			"title":        article.Title,
+			"summary":      article.Summary,
+			"content":      article.Content,
+			"sport":        article.Sport,
+			"source":       article.Source,
+			"source_url":   article.SourceURL,
+			"image_url":    article.ImageURL,
+			"author":       article.Author,
+			"published_at": article.PublishedAt.Unix(),
+		},
+	}
+
+	_, err := config.MeiliClient.Index("news").UpdateDocuments(documents, nil)
+	if err != nil {
+		log.Printf("⚠️ Failed to update article %d in Meilisearch: %v", article.ID, err)
+	} else {
+		log.Printf("🔍 Updated article %d in Meilisearch", article.ID)
+	}
 }
 
 // stripHTML removes HTML tags (basic)
@@ -157,6 +242,10 @@ func stripHTML(s string) string {
 	s = strings.ReplaceAll(s, "</p>", " ")
 	s = strings.ReplaceAll(s, "<br>", " ")
 	s = strings.ReplaceAll(s, "<br/>", " ")
+	s = strings.ReplaceAll(s, "<div>", "")
+	s = strings.ReplaceAll(s, "</div>", " ")
+	s = strings.ReplaceAll(s, "<span>", "")
+	s = strings.ReplaceAll(s, "</span>", "")
 	// Add more as needed
 	return strings.TrimSpace(s)
 }

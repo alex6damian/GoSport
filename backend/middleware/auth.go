@@ -31,7 +31,11 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	}
 
 	token := parts[1]
-	log.Printf("   Token: %s...\n", token[:20])
+	tokenPreview := token
+	if len(token) > 20 {
+		tokenPreview = token[:20] + "..."
+	}
+	log.Printf("   Token: %s\n", tokenPreview)
 
 	claims, err := utils.ValidateToken(token)
 	if err != nil {

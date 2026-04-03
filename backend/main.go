@@ -24,6 +24,9 @@ func main() {
 		log.Fatalf("⚠️  WARNING: Failed to initialize MinIO: %v", err)
 	}
 
+	// Initialize Meilisearch client and indexes
+	config.InitMeilisearch()
+
 	// Fiber setup
 	app := fiber.New(fiber.Config{
 		AppName:      "GoSport API v1",
@@ -75,7 +78,7 @@ func setupRoutes(app *fiber.App) {
 	api := app.Group("/api/v1")
 
 	// Auth routes
-	auth := api.Group("/auth", middleware.AuthRateLimiter()) // /api/v1/auth
+	auth := api.Group("/auth") //, middleware.AuthRateLimiter()) // /api/v1/auth ADD BACK AFTER DONE TESTING
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
 	log.Println("✅ Auth routes registered")
@@ -84,6 +87,8 @@ func setupRoutes(app *fiber.App) {
 	users := api.Group("/users")                                     // /api/v1/users
 	users.Get("/me", middleware.AuthMiddleware, routes.GetMyProfile) // Middleware acts first as authentication gate
 	users.Put("/me", middleware.AuthMiddleware, routes.UpdateMyProfile)
+	users.Get("/me/history", middleware.AuthMiddleware, routes.GetWatchHistory)
+	users.Get("/me/favorites", middleware.AuthMiddleware, routes.GetFavorites)
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideos)
 	log.Println("✅ User routes registered")
@@ -96,6 +101,17 @@ func setupRoutes(app *fiber.App) {
 	videos.Put("/:id", middleware.AuthMiddleware, routes.UpdateVideo)
 	videos.Delete("/:id", middleware.AuthMiddleware, routes.DeleteVideo)
 	log.Println("✅ Video routes registered")
+
+	// Video interaction routes
+	videos.Post("/:id/view", routes.TrackView) // Public - track anonymous views
+	videos.Post("/:id/progress", middleware.AuthMiddleware, routes.UpdateWatchProgress)
+	videos.Post("/:id/like", middleware.AuthMiddleware, routes.ToggleLike)
+	videos.Get("/:id/like", routes.CheckIfLiked)
+	videos.Get("/:id/likes", routes.GetVideoLikes)
+	videos.Post("/:id/favorite", middleware.AuthMiddleware, routes.ToggleFavorite)
+	videos.Get("/:id/favorite", routes.CheckIfFavorited)
+	videos.Get("/:id/stats", routes.GetVideoStats)
+	log.Println("✅ Video interaction routes registered")
 
 	// News routes
 	news := api.Group("/news")
@@ -113,4 +129,34 @@ func setupRoutes(app *fiber.App) {
 	adminAuth.Post("/feeds/:id/sync", routes.SyncRSSFeed)
 	adminAuth.Post("/feeds/sync-all", routes.SyncAllFeeds)
 	log.Println("✅ Admin routes registered")
+
+	// Meilisearch routes
+	search := api.Group("/search")
+	search.Get("/videos", routes.SearchVideos)
+	search.Get("/news", routes.SearchNews)
+	log.Println("✅ Search routes registered")
+
+	// Subscription routes
+	users.Get("/me/subscriptions", middleware.AuthMiddleware, routes.GetSubscriptions) // /me to avoid conflicts
+	users.Post("/:userId/subscribe", middleware.AuthMiddleware, routes.Subscribe)
+	users.Delete("/:userId/unsubscribe", middleware.AuthMiddleware, routes.Unsubscribe)
+	users.Get("/:userId/subscription", middleware.AuthMiddleware, routes.CheckSubscription)
+	users.Get("/:userId/subscribers", routes.GetSubscribers) // No auth required to view subscribers list
+	log.Println("✅ Subscription routes registered")
+
+	// Comment routes
+	comments := api.Group("/comments")
+	videos.Post("/:id/comments", middleware.AuthMiddleware, routes.AddComment)
+	videos.Get("/:id/comments", routes.ListVideoComments)
+	comments.Put("/:id", middleware.AuthMiddleware, routes.UpdateComment)
+	comments.Delete("/:id", middleware.AuthMiddleware, routes.DeleteComment)
+	comments.Get("/:id/replies", routes.ListCommentReplies)
+	comments.Post("/:id/replies", middleware.AuthMiddleware, routes.AddReply)
+	log.Println("✅ Comment routes registered")
+
+	// Feed routes
+	feed := api.Group("/feed")
+	feed.Get("/", middleware.AuthMiddleware, routes.GetFeed)
+	log.Println("✅ Feed routes registered")
+
 }

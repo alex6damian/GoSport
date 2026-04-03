@@ -24,13 +24,15 @@ type Video struct {
 	Status   string `gorm:"default:pending" json:"status"` // pending, processing, ready, failed
 
 	// Stats
-	Views int `gorm:"default:0" json:"views"`
-	Likes int `gorm:"default:0" json:"likes"`
+	Views     int    `gorm:"column:views;default:0;index" json:"views_count"`
+	Likes     int    `gorm:"column:likes;default:0;index" json:"likes_count"`
+	Favorites int    `gorm:"column:favorites;default:0;index" json:"favorites_count"`
+	Tags      string `json:"tags"` // comma-separated tags for search
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relations
 	User     User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Comments []Comment `gorm:"foreignKey:VideoID" json:"comments,omitempty"`
+	Comments []Comment `gorm:"foreignKey:VideoID" json:"-"`
 }

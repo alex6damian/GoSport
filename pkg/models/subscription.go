@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -15,7 +16,16 @@ type Subscription struct {
 	// Relations
 	Subscriber User `gorm:"foreignKey:SubscriberID" json:"subscriber,omitempty"`
 	Creator    User `gorm:"foreignKey:CreatorID" json:"creator,omitempty"`
+}
 
-	// Unique constraint: a user can subscribe to a creator only once
-	gorm.Model `gorm:"uniqueIndex: idx_subscriber_creator,composite:subscriber_id,creator_id"`
+func (Subscription) TableName() string {
+	return "subscriptions"
+}
+
+// Validation hook to ensure a user cannot subscribe to themselves
+func (s *Subscription) BeforeCreate(tx *gorm.DB) error {
+	if s.SubscriberID == s.CreatorID {
+		return errors.New("a user cannot subscribe to themselves")
+	}
+	return nil
 }

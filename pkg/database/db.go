@@ -45,6 +45,9 @@ func RunMigrations() {
 		&models.Comment{},
 		&models.ProcessingJob{},
 		&models.RSSFeed{},
+		&models.VideoView{},
+		&models.VideoLike{},
+		&models.Favorite{},
 	)
 
 	if err != nil {
