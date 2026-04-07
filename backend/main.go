@@ -81,6 +81,9 @@ func setupRoutes(app *fiber.App) {
 	auth := api.Group("/auth") //, middleware.AuthRateLimiter()) // /api/v1/auth ADD BACK AFTER DONE TESTING
 	auth.Post("/register", routes.Register)
 	auth.Post("/login", routes.Login)
+	auth.Get("/verify-email", routes.VerifyEmail)
+	auth.Post("/forgot-password", routes.ForgotPassword)
+	auth.Post("/reset-password", routes.ResetPassword)
 	log.Println("✅ Auth routes registered")
 
 	// User routes

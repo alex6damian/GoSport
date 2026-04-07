@@ -7,16 +7,20 @@ import (
 )
 
 type User struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Username  string         `gorm:"unique;not null" json:"username"`
-	Email     string         `gorm:"unique;not null" json:"email"`
-	Password  string         `gorm:"not null" json:"-"`              // hashed password, exclude from JSON responses
-	Verified  bool           `gorm:"default: false" json:"verified"` // email verified
-	Role      string         `gorm:"default: user" json:"role"`      // viewer, creator
-	Avatar    string         `json:"avatar"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // soft delete
+	ID                         uint           `gorm:"primaryKey" json:"id"`
+	Username                   string         `gorm:"unique;not null" json:"username"`
+	Email                      string         `gorm:"unique;not null" json:"email"`
+	Password                   string         `gorm:"not null" json:"-"`              // hashed password, exclude from JSON responses
+	Verified                   bool           `gorm:"default: false" json:"verified"` // email verified
+	VerificationToken          string         `json:"-"`
+	VerificationTokenExpiresAt time.Time      `json:"-"`
+	ResetToken                 string         `json:"-"`                         // password reset token
+	ResetTokenExpiresAt        time.Time      `json:"-"`                         // password reset token expiration
+	Role                       string         `gorm:"default: user" json:"role"` // viewer, creator
+	Avatar                     string         `json:"avatar"`
+	CreatedAt                  time.Time      `json:"created_at"`
+	UpdatedAt                  time.Time      `json:"updated_at"`
+	DeletedAt                  gorm.DeletedAt `gorm:"index" json:"-"` // soft delete
 
 	// Subscription fields
 	SubscribersCount   uint `gorm:"default:0" json:"subscribers_count"`   // how many subscribers this user has

@@ -218,6 +218,9 @@ Go structs that map to database tables:
 ### 🔐 Authentication
 - `POST /api/v1/auth/register` - Register new user
 - `POST /api/v1/auth/login` - Login and get JWT token
+- `GET /api/v1/auth/verify-email` - Verify email with token
+- `POST /api/v1/auth/forgot-password` - Request password reset (sends email with token)
+- `POST /api/v1/auth/reset-password` - Reset password with token
 
 ### 👤 Users
 - `GET /api/v1/users/me` - Get current user profile (auth required)

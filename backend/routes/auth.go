@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"github.com/alex6damian/GoSport/backend/services"
 	"github.com/alex6damian/GoSport/backend/utils"
 	"github.com/alex6damian/GoSport/pkg/database"
 	"github.com/alex6damian/GoSport/pkg/models"
@@ -33,9 +34,21 @@ type UserResponse struct {
 	ID        uint   `json:"id"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
+	Verified  bool   `json:"verified"`
 	Role      string `json:"role"`
 	Avatar    string `json:"avatar,omitempty"`
 	CreatedAt string `json:"created_at"`
+}
+
+// ForgotPasswordRequest represents the payload for requesting a password reset
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+// ResetPasswordRequest represents the payload for resetting password with token
+type ResetPasswordRequest struct {
+	Token    string `json:"token" validate:"required"`
+	Password string `json:"password" validate:"required,strong_password"`
 }
 
 // Register handler - POST /api/v1/auth/register
@@ -87,29 +100,47 @@ func Register(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, "Failed to create user", fiber.StatusInternalServerError)
 	}
 
-	// Generate JWT token
-	token, err := utils.GenerateToken(user.ID, user.Email, user.Role)
+	// Generate validation token
+	valToken, err := services.GenerateVerificationToken()
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to generate verification token", fiber.StatusInternalServerError)
+	}
+
+	// Save for 24h
+	err = services.SaveVerificationToken(&user, valToken)
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to save verification token", fiber.StatusInternalServerError)
+	}
+
+	// Send verification email
+	go func() {
+		err := services.SendVerificationEmail(user.Email, valToken)
+		if err != nil {
+			println("Failed to send verification email:", err.Error())
+		}
+	}()
+
+	// Generate JWT token for immediate login
+	jwtToken, err := utils.GenerateToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		return utils.ErrorResponse(c, "Failed to generate token", fiber.StatusInternalServerError)
 	}
 
-	// Response
+	// Response with user data and token
 	response := AuthResponse{
 		User: UserResponse{
 			ID:        user.ID,
 			Username:  user.Username,
 			Email:     user.Email,
+			Verified:  user.Verified,
 			Role:      user.Role,
 			Avatar:    user.Avatar,
 			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		},
-		Token: token,
+		Token: jwtToken,
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"success": true,
-		"data":    response,
-	})
+	return utils.SuccessResponse(c, response)
 }
 
 // Login handler - POST /api/v1/auth/login
@@ -152,6 +183,7 @@ func Login(c *fiber.Ctx) error {
 			ID:        user.ID,
 			Username:  user.Username,
 			Email:     user.Email,
+			Verified:  user.Verified,
 			Role:      user.Role,
 			Avatar:    user.Avatar,
 			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -160,4 +192,116 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, response)
+}
+
+// ForgotPassword handler - POST /api/v1/auth/forgot-password
+func ForgotPassword(c *fiber.Ctx) error {
+	var req ForgotPasswordRequest
+
+	// Parse and validate request
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
+	}
+
+	if err := utils.ValidateStruct(req); err != nil {
+		return utils.ErrorResponse(c, err.Error(), fiber.StatusBadRequest)
+	}
+
+	// Find user by email
+	var user models.User
+	if err := database.DB.Where("email=?", req.Email).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// For security, don't reveal if email exists or not
+			return utils.SuccessResponse(c, "If the email exists, a password reset link has been sent")
+		}
+		return utils.ErrorResponse(c, "Database error", fiber.StatusInternalServerError)
+	}
+
+	// Generate reset token
+	resetToken, err := services.GenerateVerificationToken()
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to generate reset token", fiber.StatusInternalServerError)
+	}
+
+	// Save reset token (valid for 1 hour)
+	err = services.SavePasswordResetToken(&user, resetToken)
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to save reset token", fiber.StatusInternalServerError)
+	}
+
+	// Send password reset email
+	go func() {
+		err := services.SendPasswordResetEmail(user.Email, resetToken)
+		if err != nil {
+			println("Failed to send password reset email:", err.Error())
+		}
+	}()
+
+	return utils.SuccessResponse(c, "If the email exists, a password reset link has been sent")
+}
+
+// ResetPassword handler - POST /api/v1/auth/reset-password
+func ResetPassword(c *fiber.Ctx) error {
+	var req ResetPasswordRequest
+
+	// Parse and validate request
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, "Invalid request body", fiber.StatusBadRequest)
+	}
+
+	if err := utils.ValidateStruct(req); err != nil {
+		return utils.ErrorResponse(c, err.Error(), fiber.StatusBadRequest)
+	}
+
+	// Verify reset token
+	user, err := services.VerifyPasswordResetToken(req.Token)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return utils.ErrorResponse(c, "Invalid reset token", fiber.StatusBadRequest)
+		}
+		if err == gorm.ErrInvalidData {
+			return utils.ErrorResponse(c, "Reset token has expired", fiber.StatusBadRequest)
+		}
+		return utils.ErrorResponse(c, "Failed to verify token", fiber.StatusInternalServerError)
+	}
+
+	// Hash new password
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to hash password", fiber.StatusInternalServerError)
+	}
+
+	// Update password and clear reset token
+	user.Password = hashedPassword
+	err = services.ClearPasswordResetToken(user)
+	if err != nil {
+		return utils.ErrorResponse(c, "Failed to update password", fiber.StatusInternalServerError)
+	}
+
+	// Also update the password in database
+	if err := database.DB.Model(user).Update("password", hashedPassword).Error; err != nil {
+		return utils.ErrorResponse(c, "Failed to update password", fiber.StatusInternalServerError)
+	}
+
+	return utils.SuccessResponse(c, "Password reset successfully")
+}
+
+func VerifyEmail(c *fiber.Ctx) error {
+	token := c.Query("token")
+	if token == "" {
+		return utils.ErrorResponse(c, "Verification token is required", fiber.StatusBadRequest)
+	}
+
+	_, err := services.VerifyToken(token)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return utils.ErrorResponse(c, "Invalid verification token", fiber.StatusBadRequest)
+		}
+		if err == gorm.ErrInvalidData {
+			return utils.ErrorResponse(c, "Verification token has expired", fiber.StatusBadRequest)
+		}
+		return utils.ErrorResponse(c, "Failed to verify token", fiber.StatusInternalServerError)
+	}
+
+	return utils.SuccessResponse(c, "Email verified successfully")
 }

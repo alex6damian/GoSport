@@ -21,6 +21,7 @@ type UserProfileResponse struct {
 	ID               uint   `json:"id"`
 	Username         string `json:"username"`
 	Email            string `json:"email"`
+	Verified         bool   `json:"verified"`
 	Role             string `json:"role"`
 	Avatar           string `json:"avatar,omitempty"`
 	VideosCount      int64  `json:"videos_count"`
@@ -53,6 +54,7 @@ func GetMyProfile(c *fiber.Ctx) error {
 		ID:               user.ID,
 		Username:         user.Username,
 		Email:            user.Email,
+		Verified:         user.Verified,
 		Role:             user.Role,
 		Avatar:           user.Avatar,
 		VideosCount:      videosCount,
@@ -120,6 +122,7 @@ func UpdateMyProfile(c *fiber.Ctx) error {
 		ID:               user.ID,
 		Username:         user.Username,
 		Email:            user.Email,
+		Verified:         user.Verified,
 		Role:             user.Role,
 		Avatar:           user.Avatar,
 		VideosCount:      videosCount,
@@ -155,7 +158,11 @@ func GetUserProfileByUsername(c *fiber.Ctx) error {
 
 	// Public profile
 	response := UserProfileResponse{
+		ID:               user.ID,
 		Username:         user.Username,
+		Email:            user.Email,
+		Verified:         user.Verified,
+		Role:             user.Role,
 		Avatar:           user.Avatar,
 		VideosCount:      videosCount,
 		SubscribersCount: subscribersCount,

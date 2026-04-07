@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/alex6damian/GoSport/backend/utils"
+	"github.com/alex6damian/GoSport/pkg/database"
+	"github.com/alex6damian/GoSport/pkg/models"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -89,5 +91,27 @@ func AdminOnly(c *fiber.Ctx) error {
 	}
 
 	log.Println("   ✅ Admin verified")
+	return c.Next()
+}
+
+// IsVerified checks if the user's email is verified.
+// This middleware should be used AFTER AuthMiddleware.
+func IsVerified(c *fiber.Ctx) error {
+	userID, ok := c.Locals("userID").(uint)
+	if !ok {
+		// This should not happen if AuthMiddleware is used before this
+		return utils.ErrorResponse(c, "User ID not found in context", fiber.StatusInternalServerError)
+	}
+
+	// Fetch user from database to check the 'verified' status
+	var user models.User
+	if err := database.DB.First(&user, userID).Error; err != nil {
+		return utils.ErrorResponse(c, "User not found", fiber.StatusNotFound)
+	}
+
+	if !user.Verified {
+		return utils.ErrorResponse(c, "Email not verified. Please check your email to verify your account.", fiber.StatusForbidden)
+	}
+
 	return c.Next()
 }
