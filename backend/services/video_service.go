@@ -35,11 +35,30 @@ func UploadVideo(file io.Reader, filename string, fileSize int64,
 	return objectName, nil
 }
 
-// GetVideoURL generates a presigned URL for video access
+// UploadThumbnail uploads a thumbnail image to MinIO
+func UploadThumbnail(file io.Reader, filename string, fileSize int64, contentType string) (string, error) {
+	bucketName := os.Getenv("MINIO_BUCKET_NAME")
+
+	ext := filepath.Ext(filename)
+	objectName := fmt.Sprintf("thumbnails/%s%s", uuid.New().String(), ext)
+
+	_, err := config.MinioClient.PutObject(context.Background(), bucketName, objectName,
+		file, fileSize, minio.PutObjectOptions{
+			ContentType: contentType,
+		})
+	if err != nil {
+		return "", err
+	}
+
+	return objectName, nil
+}
+
+// GetVideoURL generates a presigned URL for video access using the public client
+// so the signature matches the host the browser will send the request to.
 func GetVideoURL(objectName string, expires time.Duration) (string, error) {
 	bucketName := os.Getenv("MINIO_BUCKET_NAME")
 
-	url, err := config.MinioClient.PresignedGetObject(context.Background(),
+	url, err := config.MinioPublicClient.PresignedGetObject(context.Background(),
 		bucketName, objectName, expires, nil)
 	if err != nil {
 		return "", err

@@ -15,6 +15,8 @@ const EditProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,6 +38,25 @@ const EditProfilePage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile({ ...profile, [e.target.name]: e.target.value });
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file');
+        return;
+      }
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setPreviewImage(result);
+        setProfile({ ...profile, avatar: result });
+      };
+      reader.readAsDataURL(file);
+      setError(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,15 +186,13 @@ const EditProfilePage: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: '0.3rem' }}>
-              Avatar URL
+              Avatar
             </label>
             <input
-              type="text"
-              name="avatar"
-              value={profile.avatar}
-              onChange={handleChange}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
               disabled={submitting}
-              placeholder="https://example.com/avatar.jpg"
               style={{
                 width: '100%',
                 padding: '0.4rem 0.65rem',
@@ -187,10 +206,10 @@ const EditProfilePage: React.FC = () => {
                 opacity: submitting ? 0.6 : 1,
               }}
             />
-            {profile.avatar && (
+            {(previewImage || profile.avatar) && (
               <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
                 <img
-                  src={profile.avatar}
+                  src={previewImage || profile.avatar}
                   alt="Avatar preview"
                   style={{
                     width: '80px',

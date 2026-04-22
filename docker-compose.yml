@@ -82,6 +82,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SALT_KEY: ${SALT_KEY}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
@@ -114,6 +115,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_USE_SSL: ${MINIO_USE_SSL}
@@ -141,6 +143,20 @@ services:
       postgres:
         condition: service_healthy
       backend:
+        condition: service_healthy
+    networks:
+      - gosport-network
+
+  adminer:
+    image: adminer:latest
+    container_name: gosport-adminer
+    restart: unless-stopped
+    ports:
+      - "8069:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
         condition: service_healthy
     networks:
       - gosport-network

@@ -92,9 +92,15 @@ func setupRoutes(app *fiber.App) {
 	users.Put("/me", middleware.AuthMiddleware, routes.UpdateMyProfile)
 	users.Get("/me/history", middleware.AuthMiddleware, routes.GetWatchHistory)
 	users.Get("/me/favorites", middleware.AuthMiddleware, routes.GetFavorites)
+	users.Get("/subscriptions", middleware.AuthMiddleware, routes.GetSubscriptions) // Specific literal route - MUST be before /:username
+	users.Post("/:userId/subscribe", middleware.AuthMiddleware, routes.Subscribe)
+	users.Delete("/:userId/unsubscribe", middleware.AuthMiddleware, routes.Unsubscribe)
+	users.Get("/:userId/subscription", middleware.AuthMiddleware, routes.CheckSubscription)
+	users.Get("/:userId/subscribers", routes.GetSubscribers) // No auth required to view subscribers list
 	users.Get("/:username", routes.GetUserProfileByUsername)
 	users.Get("/:username/videos", routes.GetUserVideos)
 	log.Println("✅ User routes registered")
+	log.Println("✅ Subscription routes registered")
 
 	// Video routes
 	videos := api.Group("/videos")
@@ -138,14 +144,6 @@ func setupRoutes(app *fiber.App) {
 	search.Get("/videos", routes.SearchVideos)
 	search.Get("/news", routes.SearchNews)
 	log.Println("✅ Search routes registered")
-
-	// Subscription routes
-	users.Get("/me/subscriptions", middleware.AuthMiddleware, routes.GetSubscriptions) // /me to avoid conflicts
-	users.Post("/:userId/subscribe", middleware.AuthMiddleware, routes.Subscribe)
-	users.Delete("/:userId/unsubscribe", middleware.AuthMiddleware, routes.Unsubscribe)
-	users.Get("/:userId/subscription", middleware.AuthMiddleware, routes.CheckSubscription)
-	users.Get("/:userId/subscribers", routes.GetSubscribers) // No auth required to view subscribers list
-	log.Println("✅ Subscription routes registered")
 
 	// Comment routes
 	comments := api.Group("/comments")

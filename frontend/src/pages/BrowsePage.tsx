@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import homeBg from '../assets/home.png';
-import { getMyProfile, updateUserProfile } from '../services/userService';
+import { getMyProfile, updateUserProfile, getSubscriptions } from '../services/userService';
 import { getFeed, uploadVideo, type Video } from '../services/videoService';
 import { AxiosError } from 'axios';
 
@@ -17,16 +17,28 @@ interface UserProfile {
   created_at: string;
 }
 
+interface User {
+  id: number;
+  username: string;
+  avatar: string;
+  subscribers_count: number;
+}
+
 const BrowsePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'videos' | 'news' | 'profile' | 'upload'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'news' | 'profile' | 'subscriptions' | 'upload'>('videos');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editFormError, setEditFormError] = useState<string | null>(null);
   const [editFormSubmitting, setEditFormSubmitting] = useState(false);
   const [editFormData, setEditFormData] = useState({ username: '', email: '', avatar: '' });
+  const [editFormPreviewImage, setEditFormPreviewImage] = useState<string | null>(null);
+  const [editFormSelectedFile, setEditFormSelectedFile] = useState<File | null>(null);
+  const [editFormIsDragging, setEditFormIsDragging] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<User[]>([]);
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -49,6 +61,7 @@ const BrowsePage: React.FC = () => {
   const menuItems = [
     { id: 'videos', label: 'Videos', icon: '🎬' },
     { id: 'news', label: 'News', icon: '📰' },
+    { id: 'subscriptions', label: 'Subscriptions', icon: '⭐' },
     { id: 'upload', label: 'Upload', icon: '📤' },
     { id: 'profile', label: 'Profile', icon: '👤' },
   ];
@@ -84,16 +97,98 @@ const BrowsePage: React.FC = () => {
     }
   };
 
+  // Subscriptions fetch function
+  const fetchSubscriptions = async () => {
+    setLoadingSubscriptions(true);
+    try {
+      const response = await getSubscriptions();
+      setSubscriptions(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch subscriptions:', err);
+    } finally {
+      setLoadingSubscriptions(false);
+    }
+  };
+
+  // Fetch profile on component mount
+  useEffect(() => {
+    if (!profile) {
+      fetchProfile();
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'profile' && !profile) {
       fetchProfile();
     } else if (activeTab === 'videos' && videos.length === 0) {
       fetchVideos();
+    } else if (activeTab === 'subscriptions' && subscriptions.length === 0) {
+      fetchSubscriptions();
     }
   }, [activeTab]);
 
   const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
+  };
+
+  const handleEditFormFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setEditFormError('Please select a valid image file');
+        return;
+      }
+      setEditFormSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setEditFormPreviewImage(result);
+        setEditFormData({ ...editFormData, avatar: result });
+      };
+      reader.readAsDataURL(file);
+      setEditFormError(null);
+    }
+  };
+
+  const handleEditFormDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditFormIsDragging(true);
+  };
+
+  const handleEditFormDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditFormIsDragging(false);
+  };
+
+  const handleEditFormDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleEditFormDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditFormIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const selectedFile = files[0];
+      if (selectedFile.type.startsWith('image/')) {
+        setEditFormSelectedFile(selectedFile);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const result = event.target?.result as string;
+          setEditFormPreviewImage(result);
+          setEditFormData({ ...editFormData, avatar: result });
+        };
+        reader.readAsDataURL(selectedFile);
+        setEditFormError(null);
+      } else {
+        setEditFormError('Please select a valid image file');
+      }
+    }
   };
 
   const handleEditFormSubmit = async (e: React.FormEvent) => {
@@ -119,8 +214,8 @@ const BrowsePage: React.FC = () => {
   };
 
   const handleMenuClick = (id: string) => {
-    if (id === 'videos' || id === 'news' || id === 'profile' || id === 'upload') {
-      setActiveTab(id as 'videos' | 'news' | 'profile' | 'upload');
+    if (id === 'videos' || id === 'news' || id === 'profile' || id === 'subscriptions' || id === 'upload') {
+      setActiveTab(id as 'videos' | 'news' | 'profile' | 'subscriptions' | 'upload');
     }
   };
 
@@ -265,6 +360,7 @@ const BrowsePage: React.FC = () => {
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
+      backgroundAttachment: 'fixed',
       display: 'flex',
       zIndex: 9999,
       fontFamily: "'Inter', sans-serif",
@@ -412,6 +508,7 @@ const BrowsePage: React.FC = () => {
                 {videos.map((video) => (
                   <div
                     key={video.id}
+                    onClick={() => navigate(`/videos/${video.id}`)}
                     style={{
                       background: 'rgba(255, 255, 255, 0.08)',
                       backdropFilter: 'blur(12px)',
@@ -537,6 +634,94 @@ const BrowsePage: React.FC = () => {
             <p style={{ fontSize: '1.2rem', opacity: 0.7 }}>News coming soon...</p>
           </div>
         )}
+        {activeTab === 'subscriptions' && (
+          <div>
+            <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>
+              My Subscriptions
+            </h2>
+            {loadingSubscriptions ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', padding: '2rem' }}>
+                <p>Loading subscriptions...</p>
+              </div>
+            ) : subscriptions.length > 0 ? (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '1.5rem',
+              }}>
+                {subscriptions.map((user) => (
+                  <Link
+                    key={user.id}
+                    to={`/users/${user.username}`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <div
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                        e.currentTarget.style.transform = 'translateY(-8px)';
+                        e.currentTarget.style.boxShadow = '0 12px 32px rgba(0, 0, 0, 0.4)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <img
+                        src={user.avatar || `https://i.pravatar.cc/150?u=${user.id}`}
+                        alt={`${user.username}'s avatar`}
+                        style={{
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '3px solid rgba(0, 141, 223, 0.6)',
+                          marginBottom: '1rem',
+                        }}
+                      />
+                      <h3 style={{
+                        color: '#ffffff',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        margin: '0 0 0.5rem 0',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                      }}>
+                        {user.username}
+                      </h3>
+                      <p style={{
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        fontSize: '0.75rem',
+                        margin: 0,
+                      }}>
+                        {user.subscribers_count} subscribers
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', padding: '2rem' }}>
+                <p>You haven't subscribed to anyone yet.</p>
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'profile' && (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
             {loadingProfile ? (
@@ -610,43 +795,77 @@ const BrowsePage: React.FC = () => {
 
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: '0.3rem' }}>
-                        Avatar URL
+                        Avatar
                       </label>
-                      <input
-                        type="text"
-                        name="avatar"
-                        value={editFormData.avatar}
-                        onChange={handleEditFormChange}
-                        disabled={editFormSubmitting}
-                        placeholder="https://example.com/avatar.jpg"
+                      <div
+                        onDragEnter={handleEditFormDragEnter}
+                        onDragLeave={handleEditFormDragLeave}
+                        onDragOver={handleEditFormDragOver}
+                        onDrop={handleEditFormDrop}
                         style={{
-                          width: '100%',
-                          padding: '0.4rem 0.65rem',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255,255,255,0.25)',
-                          background: 'rgba(255,255,255,0.15)',
-                          color: '#ffffff',
-                          fontSize: '0.9rem',
-                          boxSizing: 'border-box',
-                          outline: 'none',
-                          opacity: editFormSubmitting ? 0.6 : 1,
+                          position: 'relative',
+                          border: `2px dashed ${editFormIsDragging ? '#008ddf' : 'rgba(255,255,255,0.3)'}`,
+                          borderRadius: '10px',
+                          padding: '1.5rem 1rem',
+                          textAlign: 'center',
+                          background: editFormIsDragging ? 'rgba(0,141,223,0.1)' : 'rgba(255,255,255,0.05)',
+                          transition: 'all 0.2s ease',
+                          cursor: 'pointer',
+                          minHeight: '120px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'column',
                         }}
-                      />
-                      {editFormData.avatar && (
-                        <div style={{ marginTop: '0.75rem', textAlign: 'center' }}>
-                          <img
-                            src={editFormData.avatar}
-                            alt="Avatar preview"
-                            style={{
-                              width: '80px',
-                              height: '80px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: '2px solid rgba(0, 141, 223, 0.6)',
-                            }}
-                          />
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleEditFormFileSelect}
+                          disabled={editFormSubmitting}
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            cursor: editFormSubmitting ? 'not-allowed' : 'pointer',
+                            opacity: 0,
+                          }}
+                        />
+                        <div style={{ pointerEvents: 'none' }}>
+                          {editFormPreviewImage ? (
+                            <>
+                              <img
+                                src={editFormPreviewImage}
+                                alt="Avatar preview"
+                                style={{
+                                  width: '60px',
+                                  height: '60px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  border: '2px solid rgba(0, 141, 223, 0.6)',
+                                  display: 'block',
+                                  margin: '0 auto 0.6rem',
+                                }}
+                              />
+                              <p style={{ color: '#008ddf', fontWeight: 600, margin: '0.2rem 0', fontSize: '0.75rem' }}>
+                                {editFormSelectedFile?.name}
+                              </p>
+                              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', margin: 0 }}>
+                                Click or drag to change
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>🖼️</div>
+                              <p style={{ color: '#ffffff', fontWeight: 600, margin: '0.2rem 0', fontSize: '0.8rem' }}>
+                                Drag your photo here
+                              </p>
+                              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', margin: 0 }}>
+                                or click to browse
+                              </p>
+                            </>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {editFormError && (
@@ -766,11 +985,11 @@ const BrowsePage: React.FC = () => {
                   </div>
 
                   <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>Keep the flow if you want to grow</span>
+                    </p>
                     <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: 0 }}>
                       <span style={{ color: 'rgba(255,255,255,0.5)' }}>Member since:</span> {new Date(profile.created_at).toLocaleDateString()}
-                    </p>
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.5)' }}>Email:</span> {profile.email}
                     </p>
                   </div>
 
@@ -810,7 +1029,7 @@ const BrowsePage: React.FC = () => {
           </div>
         )}
         {activeTab === 'upload' && (
-          <div style={{ maxWidth: '450px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
             <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', textAlign: 'center' }}>
               Upload Video
             </h2>
@@ -838,350 +1057,368 @@ const BrowsePage: React.FC = () => {
                 color: '#fca5a5',
                 fontSize: '0.85rem',
                 borderRadius: '4px',
-                marginBottom: '1.5rem',
+                marginBottom: '1rem',
               }}>
                 {uploadError}
               </div>
             )}
 
-            <form onSubmit={handleUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {/* Video File */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.8)',
-                  marginBottom: '0.2rem',
-                }}>
-                  Video File *
-                </label>
-                <div
-                  onDragEnter={handleUploadDragEnter}
-                  onDragLeave={handleUploadDragLeave}
-                  onDragOver={handleUploadDragOver}
-                  onDrop={handleUploadDrop}
-                  style={{
-                    position: 'relative',
-                    border: `2px dashed ${uploadIsDragging ? '#008ddf' : 'rgba(255,255,255,0.3)'}`,
-                    borderRadius: '8px',
-                    padding: '0.6rem',
-                    textAlign: 'center',
-                    background: uploadIsDragging ? 'rgba(0,141,223,0.1)' : 'rgba(255,255,255,0.05)',
-                    transition: 'all 0.2s ease',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={handleUploadFileChange}
-                    disabled={uploading}
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      cursor: uploading ? 'not-allowed' : 'pointer',
-                      opacity: 0,
-                    }}
-                  />
-                  <div style={{ pointerEvents: 'none' }}>
-                    <div style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>📹</div>
-                    {uploadFile ? (
-                      <>
-                        <p style={{ color: '#008ddf', fontWeight: 600, margin: '0.1rem 0', fontSize: '0.7rem' }}>
-                          {uploadFile.name}
-                        </p>
-                        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', margin: 0 }}>
-                          {(uploadFile.size / (1024 * 1024)).toFixed(2)} MB
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p style={{ color: '#ffffff', fontWeight: 600, margin: '0.1rem 0', fontSize: '0.7rem' }}>
-                          Drag and drop your video here
-                        </p>
-                        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', margin: 0 }}>
-                          or click to browse (Max 100 MB)
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Thumbnail */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.8)',
-                  marginBottom: '0.2rem',
-                }}>
-                  Thumbnail Image
-                </label>
-                <div style={{
-                  position: 'relative',
-                  border: '2px dashed rgba(255,255,255,0.3)',
-                  borderRadius: '8px',
-                  padding: '0.5rem',
-                  textAlign: 'center',
-                  background: 'rgba(255,255,255,0.05)',
-                  cursor: 'pointer',
-                }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleUploadThumbnailChange}
-                    disabled={uploading}
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      cursor: uploading ? 'not-allowed' : 'pointer',
-                      opacity: 0,
-                    }}
-                  />
-                  <div style={{ pointerEvents: 'none' }}>
-                    {uploadThumbnailPreview ? (
-                      <div style={{ textAlign: 'center' }}>
-                        <img
-                          src={uploadThumbnailPreview}
-                          alt="Thumbnail preview"
-                          style={{
-                            maxWidth: '100%',
-                            maxHeight: '80px',
-                            borderRadius: '6px',
-                            marginBottom: '0.3rem',
-                          }}
-                        />
-                        <p style={{ color: '#008ddf', fontWeight: 500, margin: '0.1rem 0', fontSize: '0.7rem' }}>
-                          {uploadThumbnail?.name}
-                        </p>
+            <form onSubmit={handleUploadSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+                {/* Left column — file & thumbnail */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Video File */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: '0.4rem',
+                    }}>
+                      Video File *
+                    </label>
+                    <div
+                      onDragEnter={handleUploadDragEnter}
+                      onDragLeave={handleUploadDragLeave}
+                      onDragOver={handleUploadDragOver}
+                      onDrop={handleUploadDrop}
+                      style={{
+                        position: 'relative',
+                        border: `2px dashed ${uploadIsDragging ? '#008ddf' : 'rgba(255,255,255,0.3)'}`,
+                        borderRadius: '10px',
+                        padding: '1.5rem 1rem',
+                        textAlign: 'center',
+                        background: uploadIsDragging ? 'rgba(0,141,223,0.1)' : 'rgba(255,255,255,0.05)',
+                        transition: 'all 0.2s ease',
+                        cursor: 'pointer',
+                        minHeight: '120px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={handleUploadFileChange}
+                        disabled={uploading}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          cursor: uploading ? 'not-allowed' : 'pointer',
+                          opacity: 0,
+                        }}
+                      />
+                      <div style={{ pointerEvents: 'none' }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>📹</div>
+                        {uploadFile ? (
+                          <>
+                            <p style={{ color: '#008ddf', fontWeight: 600, margin: '0.2rem 0', fontSize: '0.75rem' }}>
+                              {uploadFile.name}
+                            </p>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', margin: 0 }}>
+                              {(uploadFile.size / (1024 * 1024)).toFixed(2)} MB
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p style={{ color: '#ffffff', fontWeight: 600, margin: '0.2rem 0', fontSize: '0.8rem' }}>
+                              Drag & drop your video here
+                            </p>
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', margin: 0 }}>
+                              or click to browse (Max 100 MB)
+                            </p>
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: '1rem', marginBottom: '0.15rem' }}>🖼️</div>
-                        <p style={{ color: '#ffffff', fontWeight: 500, margin: '0.05rem 0', fontSize: '0.7rem' }}>
-                          Select thumbnail
-                        </p>
-                        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.6rem', margin: 0 }}>
-                          (optional)
-                        </p>
-                      </>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Title */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.8)',
-                  marginBottom: '0.2rem',
-                }}>
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={uploadFormData.title}
-                  onChange={handleUploadFormChange}
-                  disabled={uploading}
-                  placeholder="Enter video title"
-                  style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    background: 'rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                    opacity: uploading ? 0.6 : 1,
-                  }}
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.8)',
-                  marginBottom: '0.2rem',
-                }}>
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={uploadFormData.description}
-                  onChange={handleUploadFormChange}
-                  disabled={uploading}
-                  placeholder="Describe your video..."
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    background: 'rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                    resize: 'none',
-                    opacity: uploading ? 0.6 : 1,
-                  }}
-                />
-              </div>
-
-              {/* Sport */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.8)',
-                  marginBottom: '0.2rem',
-                }}>
-                  Sport
-                </label>
-                <input
-                  type="text"
-                  name="sport"
-                  value={uploadFormData.sport}
-                  onChange={handleUploadFormChange}
-                  disabled={uploading}
-                  placeholder="e.g., Football, Basketball, Tennis"
-                  style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    background: 'rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                    opacity: uploading ? 0.6 : 1,
-                  }}
-                />
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.8)',
-                  marginBottom: '0.2rem',
-                }}>
-                  Tags
-                </label>
-                <input
-                  type="text"
-                  name="tags"
-                  value={uploadFormData.tags}
-                  onChange={handleUploadFormChange}
-                  disabled={uploading}
-                  placeholder="Comma-separated tags (e.g., goal, highlights, training)"
-                  style={{
-                    width: '100%',
-                    padding: '0.4rem 0.6rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    background: 'rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                    opacity: uploading ? 0.6 : 1,
-                  }}
-                />
-              </div>
-
-              {/* Upload Progress */}
-              {uploading && (
-                <div>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.3rem',
-                    color: 'rgba(255,255,255,0.7)',
-                    fontSize: '0.75rem',
-                  }}>
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div style={{
-                    width: '100%',
-                    height: '8px',
-                    background: 'rgba(255,255,255,0.1)',
-                    borderRadius: '4px',
-                    overflow: 'hidden',
-                  }}>
+                  {/* Thumbnail */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: '0.4rem',
+                    }}>
+                      Thumbnail Image
+                    </label>
                     <div style={{
-                      height: '100%',
-                      width: `${uploadProgress}%`,
-                      background: 'linear-gradient(90deg, #008ddf, #00d4ff)',
-                      transition: 'width 0.2s ease',
-                    }} />
+                      position: 'relative',
+                      border: '2px dashed rgba(255,255,255,0.3)',
+                      borderRadius: '10px',
+                      padding: '1.2rem 1rem',
+                      textAlign: 'center',
+                      background: 'rgba(255,255,255,0.05)',
+                      cursor: 'pointer',
+                      minHeight: '100px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleUploadThumbnailChange}
+                        disabled={uploading}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          cursor: uploading ? 'not-allowed' : 'pointer',
+                          opacity: 0,
+                        }}
+                      />
+                      <div style={{ pointerEvents: 'none' }}>
+                        {uploadThumbnailPreview ? (
+                          <div style={{ textAlign: 'center' }}>
+                            <img
+                              src={uploadThumbnailPreview}
+                              alt="Thumbnail preview"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: '100px',
+                                borderRadius: '6px',
+                                marginBottom: '0.4rem',
+                              }}
+                            />
+                            <p style={{ color: '#008ddf', fontWeight: 500, margin: '0.1rem 0', fontSize: '0.7rem' }}>
+                              {uploadThumbnail?.name}
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            <div>
+                              <div style={{ fontSize: '1.5rem', marginBottom: '0.3rem' }}>🖼️</div>
+                              <p style={{ color: '#ffffff', fontWeight: 500, margin: '0.1rem 0', fontSize: '0.8rem' }}>
+                                Select thumbnail
+                              </p>
+                              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', margin: 0 }}>
+                                optional
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem' }}>
-                <button
-                  type="submit"
-                  disabled={uploading || !uploadFile}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    background: '#e63946',
-                    color: '#fff',
-                    fontWeight: 700,
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 20px rgba(230,57,70,0.35)',
-                    transition: 'all 0.2s ease',
-                    opacity: uploading || !uploadFile ? 0.6 : 1,
-                  }}
-                  onMouseEnter={e => !uploading && !uploadFile === false && (e.currentTarget.style.background = '#c1121f', e.currentTarget.style.transform = 'translateY(-2px)')}
-                  onMouseLeave={e => !uploading && !uploadFile === false && (e.currentTarget.style.background = '#e63946', e.currentTarget.style.transform = 'translateY(0)')}
-                >
-                  {uploading ? 'Uploading...' : 'Upload Video'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('videos')}
-                  disabled={uploading}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    background: 'rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    cursor: uploading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                    opacity: uploading ? 0.6 : 1,
-                  }}
-                  onMouseEnter={e => !uploading && (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
-                  onMouseLeave={e => !uploading && (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
-                >
-                  Cancel
-                </button>
+                {/* Right column — metadata & actions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  {/* Title */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: '0.3rem',
+                    }}>
+                      Title *
+                    </label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={uploadFormData.title}
+                      onChange={handleUploadFormChange}
+                      disabled={uploading}
+                      placeholder="Enter video title"
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.7rem',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#ffffff',
+                        fontSize: '0.85rem',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: '0.3rem',
+                    }}>
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={uploadFormData.description}
+                      onChange={handleUploadFormChange}
+                      disabled={uploading}
+                      placeholder="Describe your video..."
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.7rem',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#ffffff',
+                        fontSize: '0.85rem',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        resize: 'none',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    />
+                  </div>
+
+                  {/* Sport */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: '0.3rem',
+                    }}>
+                      Sport
+                    </label>
+                    <input
+                      type="text"
+                      name="sport"
+                      value={uploadFormData.sport}
+                      onChange={handleUploadFormChange}
+                      disabled={uploading}
+                      placeholder="e.g., Football, Basketball, Tennis"
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.7rem',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#ffffff',
+                        fontSize: '0.85rem',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    />
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: '0.3rem',
+                    }}>
+                      Tags
+                    </label>
+                    <input
+                      type="text"
+                      name="tags"
+                      value={uploadFormData.tags}
+                      onChange={handleUploadFormChange}
+                      disabled={uploading}
+                      placeholder="Comma-separated (e.g., goal, highlights, training)"
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.7rem',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#ffffff',
+                        fontSize: '0.85rem',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    />
+                  </div>
+
+                  {/* Upload Progress */}
+                  {uploading && (
+                    <div>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '0.3rem',
+                        color: 'rgba(255,255,255,0.7)',
+                        fontSize: '0.75rem',
+                      }}>
+                        <span>Uploading...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div style={{
+                        width: '100%',
+                        height: '8px',
+                        background: 'rgba(255,255,255,0.1)',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${uploadProgress}%`,
+                          background: 'linear-gradient(90deg, #008ddf, #00d4ff)',
+                          transition: 'width 0.2s ease',
+                        }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Buttons */}
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                    <button
+                      type="submit"
+                      disabled={uploading || !uploadFile}
+                      style={{
+                        flex: 1,
+                        padding: '0.6rem',
+                        background: '#e63946',
+                        color: '#fff',
+                        fontWeight: 700,
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        cursor: uploading || !uploadFile ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 20px rgba(230,57,70,0.35)',
+                        transition: 'all 0.2s ease',
+                        opacity: uploading || !uploadFile ? 0.6 : 1,
+                      }}
+                      onMouseEnter={e => !uploading && !!uploadFile && (e.currentTarget.style.background = '#c1121f', e.currentTarget.style.transform = 'translateY(-2px)')}
+                      onMouseLeave={e => !uploading && !!uploadFile && (e.currentTarget.style.background = '#e63946', e.currentTarget.style.transform = 'translateY(0)')}
+                    >
+                      {uploading ? 'Uploading...' : 'Upload Video'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('videos')}
+                      disabled={uploading}
+                      style={{
+                        flex: 1,
+                        padding: '0.6rem',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                      onMouseEnter={e => !uploading && (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+                      onMouseLeave={e => !uploading && (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
             </form>
           </div>

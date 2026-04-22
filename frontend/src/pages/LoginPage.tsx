@@ -25,7 +25,7 @@ const LoginPage: React.FC = () => {
     try {
       const response = await login(email, password);
       localStorage.setItem('token', response.data.token);
-      navigate('/me');
+      navigate('/browse');
     } catch (err) {
       setError('Invalid email or password. Please try again.');
       console.error(err);

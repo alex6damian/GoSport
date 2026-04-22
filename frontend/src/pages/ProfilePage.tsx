@@ -41,15 +41,23 @@ const ProfilePage: React.FC = () => {
   if (loading) {
     return (
       <div style={{
-        position: 'fixed', top: 0, left: 0,
-        width: '100vw', height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
         backgroundImage: `url(${homeBg})`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 9999,
       }}>
         <div style={{
-          position: 'absolute', inset: 0,
+          position: 'absolute',
+          inset: 0,
           background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.2) 100%)',
           pointerEvents: 'none',
         }} />
@@ -61,15 +69,23 @@ const ProfilePage: React.FC = () => {
   if (error) {
     return (
       <div style={{
-        position: 'fixed', top: 0, left: 0,
-        width: '100vw', height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
         backgroundImage: `url(${homeBg})`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 9999,
       }}>
         <div style={{
-          position: 'absolute', inset: 0,
+          position: 'absolute',
+          inset: 0,
           background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.2) 100%)',
           pointerEvents: 'none',
         }} />
@@ -81,15 +97,23 @@ const ProfilePage: React.FC = () => {
   if (!profile) {
     return (
       <div style={{
-        position: 'fixed', top: 0, left: 0,
-        width: '100vw', height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
         backgroundImage: `url(${homeBg})`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 9999,
       }}>
         <div style={{
-          position: 'absolute', inset: 0,
+          position: 'absolute',
+          inset: 0,
           background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.2) 100%)',
           pointerEvents: 'none',
         }} />
@@ -100,60 +124,72 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div style={{
-      position: 'fixed', top: 0, left: 0,
-      width: '100vw', height: '100vh',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
       backgroundImage: `url(${homeBg})`,
-      backgroundSize: 'cover', backgroundPosition: 'center',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       zIndex: 9999,
+      padding: '2rem 1rem',
       overflowY: 'auto',
-      padding: '2rem 0',
     }}>
+      {/* Dark overlay — gradient */}
       <div style={{
-        position: 'absolute', inset: 0,
+        position: 'absolute',
+        inset: 0,
         background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.2) 100%)',
         pointerEvents: 'none',
       }} />
 
       <div style={{
-        position: 'relative', zIndex: 1,
-        width: '100%', maxWidth: '500px',
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        borderRadius: '12px',
-        padding: '2rem',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        margin: '1rem',
+        position: 'relative',
+        zIndex: 1,
+        width: '100%',
+        maxWidth: '600px',
+        background: 'rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        borderRadius: '16px',
+        padding: '2.5rem',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img
             src={profile.avatar || `https://i.pravatar.cc/150?u=${profile.id}`}
             alt={`${profile.username}'s avatar`}
             style={{
-              width: '100px',
-              height: '100px',
+              width: '120px',
+              height: '120px',
               borderRadius: '50%',
               objectFit: 'cover',
-              border: '3px solid rgba(0, 141, 223, 0.6)',
-              margin: '0 auto 1rem',
+              border: '3px solid #008ddf',
+              margin: '0 auto 1.5rem',
               display: 'block',
+              boxShadow: '0 4px 12px rgba(0, 141, 223, 0.4)',
             }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+            <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
               {profile.username}
             </h1>
             {profile.verified && (
               <span style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                background: 'rgba(34, 197, 94, 0.15)',
+                gap: '0.5rem',
+                background: 'rgba(34, 197, 94, 0.2)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
                 color: '#86efac',
-                padding: '0.3rem 0.6rem',
-                borderRadius: '9999px',
+                padding: '0.35rem 0.75rem',
+                borderRadius: '20px',
                 fontSize: '0.75rem',
                 fontWeight: 600,
               }}>
@@ -161,80 +197,59 @@ const ProfilePage: React.FC = () => {
               </span>
             )}
           </div>
+
+          {profile.role === 'admin' && (
+            <p style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: 600, margin: '0.5rem 0 0' }}>👑 Admin</p>
+          )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginBottom: '0.4rem' }}>Videos</p>
-            <p style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{profile.videos_count}</p>
+        <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '1.6rem', fontWeight: 700, color: '#00d4ff', margin: '0 0 0.4rem' }}>
+              {profile.videos_count}
+            </p>
+            <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', margin: 0 }}>Videos</p>
           </div>
-          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginBottom: '0.4rem' }}>Subscribers</p>
-            <p style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{profile.subscribers_count}</p>
+          <div style={{ height: '40px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '1.6rem', fontWeight: 700, color: '#00d4ff', margin: '0 0 0.4rem' }}>
+              {profile.subscribers_count}
+            </p>
+            <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', margin: 0 }}>Subscribers</p>
           </div>
         </div>
 
-        <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: 0 }}>
-            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Member since:</span> {new Date(profile.created_at).toLocaleDateString()}
-          </p>
-        </div>
+        <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center', margin: '0 0 2rem', borders: '1px solid rgba(255,255,255,0.1)' }}>
+          Member since {new Date(profile.created_at).toLocaleDateString()}
+        </p>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <Link
             to="/edit-profile"
             style={{
-              display: 'block',
-              textAlign: 'center',
               width: '100%',
-              padding: '0.6rem',
-              background: '#e63946',
-              color: '#fff',
-              fontWeight: 700,
+              padding: '0.7rem 1rem',
+              background: '#008ddf',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(230,57,70,0.35)',
-              textDecoration: 'none',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = '#c1121f';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = '#e63946';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            Edit Profile
-          </Link>
-          <Link
-            to="/"
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              width: '100%',
-              padding: '0.6rem',
-              background: 'rgba(255,255,255,0.15)',
               color: '#ffffff',
+              fontSize: '0.9rem',
               fontWeight: 600,
-              border: '1px solid rgba(255,255,255,0.25)',
-              borderRadius: '8px',
-              fontSize: '0.95rem',
               cursor: 'pointer',
+              borderRadius: '8px',
+              transition: 'all 0.3s ease',
               textDecoration: 'none',
-              transition: 'all 0.2s ease',
+              textAlign: 'center',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+              e.currentTarget.style.background = '#0071b8';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 141, 223, 0.4)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+              e.currentTarget.style.background = '#008ddf';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            Back to Home
+            ✏️ Edit Profile
           </Link>
         </div>
       </div>

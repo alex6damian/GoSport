@@ -141,9 +141,12 @@ func (s *CommentService) DeleteComment(userID, commentID uint) error {
 		return gorm.ErrRecordNotFound // 404
 	}
 
-	// check ownership
+	// Allow comment owner OR video owner to delete
 	if comment.UserID != userID {
-		return errors.New("Forbidden access")
+		var video models.Video
+		if err := s.DB.Select("user_id").First(&video, comment.VideoID).Error; err != nil || video.UserID != userID {
+			return errors.New("Forbidden access")
+		}
 	}
 
 	// transaction: set content & soft delete

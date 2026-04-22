@@ -35,3 +35,27 @@ export const getUserVideos = async (username: string) => {
   const response = await api.get(`/users/${username}/videos`);
   return response.data;
 };
+
+// GET /api/v1/users/subscriptions
+export const getSubscriptions = async () => {
+  const response = await api.get('/users/subscriptions');
+  return response.data;
+};
+
+// POST /api/v1/users/:userId/subscribe
+export const subscribeToUser = async (userId: number) => {
+  const response = await api.post(`/users/${userId}/subscribe`);
+  return response.data;
+};
+
+// DELETE /api/v1/users/:userId/unsubscribe
+export const unsubscribeFromUser = async (userId: number) => {
+  const response = await api.delete(`/users/${userId}/unsubscribe`);
+  return response.data;
+};
+
+// GET /api/v1/users/:userId/subscription
+export const checkSubscription = async (userId: number) => {
+  const response = await api.get(`/users/${userId}/subscription`);
+  return response.data;
+};

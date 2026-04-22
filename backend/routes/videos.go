@@ -102,6 +102,24 @@ func UploadVideo(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fmt.Sprintf("Failed to upload video: %v", err), fiber.StatusInternalServerError)
 	}
 
+	// Handle optional thumbnail upload
+	var thumbnailKey string
+	thumbnailFiles := form.File["thumbnail"]
+	if len(thumbnailFiles) > 0 {
+		thumbFile := thumbnailFiles[0]
+		thumbReader, err := thumbFile.Open()
+		if err != nil {
+			log.Printf("Failed to open thumbnail: %v", err)
+		} else {
+			defer thumbReader.Close()
+			thumbnailKey, err = services.UploadThumbnail(thumbReader, thumbFile.Filename, thumbFile.Size, thumbFile.Header.Get("Content-Type"))
+			if err != nil {
+				log.Printf("Failed to upload thumbnail: %v", err)
+				thumbnailKey = ""
+			}
+		}
+	}
+
 	// Create video record in database
 	video := models.Video{
 		Title:       title,
@@ -111,10 +129,11 @@ func UploadVideo(c *fiber.Ctx) error {
 		Tags:        tags,
 		Duration:    duration,
 		MinioKey:    minioKey,
+		Thumbnail:   thumbnailKey,
 		FileName:    file.Filename,
 		FileSize:    file.Size,
 		MimeType:    file.Header.Get("Content-Type"),
-		Status:      "pending", // "ready" for simplicity, in real app this would be "pending" and a background worker would process it
+		Status:      "pending",
 	}
 
 	if err := database.DB.Create(&video).Error; err != nil {
