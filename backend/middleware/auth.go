@@ -58,6 +58,31 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+// OptionalAuthMiddleware reads the JWT token if present but never blocks the request.
+// Sets userID/userEmail/userRole in locals only when the token is valid.
+func OptionalAuthMiddleware(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Next()
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return c.Next()
+	}
+
+	claims, err := utils.ValidateToken(parts[1])
+	if err != nil {
+		return c.Next()
+	}
+
+	c.Locals("userID", claims.UserID)
+	c.Locals("userEmail", claims.Email)
+	c.Locals("userRole", claims.Role)
+
+	return c.Next()
+}
+
 // AdminOnly checks if user has admin role
 func AdminOnly(c *fiber.Ctx) error {
 	log.Printf("🔍 AdminOnly START - Method: %s, Path: %s\n", c.Method(), c.Path())

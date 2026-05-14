@@ -228,6 +228,8 @@ func GetFavorites(c *fiber.Ctx) error {
 		videos = []models.Video{}
 	}
 
+	services.GenerateThumbnailURLs(videos)
+
 	log.Printf("✅ GetFavorites returning %d videos", len(videos))
 
 	return c.JSON(fiber.Map{

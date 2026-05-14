@@ -149,7 +149,7 @@ func (s *CommentService) DeleteComment(userID, commentID uint) error {
 		}
 	}
 
-	// transaction: set content & soft delete
+	// transaction: set content, soft delete, and decrement parent replies_count
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.Comment{}).
 			Where("id=?", commentID).
@@ -157,9 +157,15 @@ func (s *CommentService) DeleteComment(userID, commentID uint) error {
 			return err
 		}
 
-		// soft delete(setting deleted_at)
 		if err := tx.Delete(&models.Comment{}, commentID).Error; err != nil {
 			return err
+		}
+
+		// Decrement replies_count on parent if this is a reply
+		if comment.ParentCommentID != nil {
+			tx.Model(&models.Comment{}).
+				Where("id = ?", *comment.ParentCommentID).
+				UpdateColumn("replies_count", gorm.Expr("GREATEST(replies_count - 1, 0)"))
 		}
 
 		return nil

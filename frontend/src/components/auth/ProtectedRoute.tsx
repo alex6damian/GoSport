@@ -1,15 +1,14 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 const ProtectedRoute: React.FC = () => {
   const token = localStorage.getItem('token');
+  const location = useLocation();
 
   if (!token) {
-    // If no token, redirect to login page
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If token exists, render the child components
   return <Outlet />;
 };
 

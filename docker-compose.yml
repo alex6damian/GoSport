@@ -44,12 +44,13 @@ services:
     image: getmeili/meilisearch:latest
     container_name: gosport-meilisearch
     restart: unless-stopped
-    environment: 
+    environment:
       MEILI_PORT: ${MEILI_PORT}
       MEILI_URL: ${MEILI_URL}
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
       MEILI_ENV: development
       MEILI_NO_ANALYTICS: true
+      MEILI_DB_PATH: /meilisearch_data
     ports:
       - "${MEILI_PORT}:${MEILI_PORT}"
     volumes:  
@@ -104,7 +105,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s                                   # Give backend 30s to start & run migrations
+      start_period: 30s                                   
   
   video-worker:
     build:

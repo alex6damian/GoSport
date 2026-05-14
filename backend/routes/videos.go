@@ -242,27 +242,26 @@ func DeleteVideo(c *fiber.Ctx) error {
 	}
 
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		// Delete associated comments first (child records)
-		if err := tx.Where("video_id = ?", video.ID).Delete(&models.Comment{}).Error; err != nil {
+		// Delete all child records that have FK constraints on videos
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.VideoView{}).Error; err != nil {
 			return err
 		}
-		// Delete associated processing jobs first (child records)
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.VideoLike{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("video_id = ?", video.ID).Delete(&models.Favorite{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("video_id = ?", video.ID).Delete(&models.Comment{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("video_id = ?", video.ID).Delete(&models.ProcessingJob{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(&video).Error; err != nil {
-			return err
-		}
-
-		// if video.Status == "ready" {
-		// 	services.DeleteHLSFolder(video.ID)
-		// }
-
-		return nil
+		return tx.Delete(&video).Error
 	})
 
 	if err != nil {
-		// Log the error for debugging purposes, but return a generic message to the client
 		log.Printf("Failed to delete video and associated data: %v", err)
 		return utils.ErrorResponse(c, "Failed to delete video", fiber.StatusInternalServerError)
 	}
@@ -275,11 +274,6 @@ func DeleteVideo(c *fiber.Ctx) error {
 			services.DeleteVideo(video.Thumbnail)
 		}
 	}()
-
-	// Delete from database (soft delete)
-	if err := database.DB.Delete(&video).Error; err != nil {
-		return utils.ErrorResponse(c, "Failed to delete video record", fiber.StatusInternalServerError)
-	}
 
 	// Remove from Meilisearch index
 	go DeleteVideoFromMeilisearch(video.ID)
@@ -333,6 +327,8 @@ func ListVideos(c *fiber.Ctx) error {
 		Find(&videos).Error; err != nil {
 		return utils.ErrorResponse(c, "Failed to fetch videos", fiber.StatusInternalServerError)
 	}
+
+	services.GenerateThumbnailURLs(videos)
 
 	// Create pagination metadata
 	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, total)

@@ -18,6 +18,7 @@ import EditProfilePage from './pages/EditProfilePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import VideoPlayer from './pages/VideoPlayer';
+import NewsArticlePage from './pages/NewsArticlePage';
 
 function App() {
   return (
@@ -41,6 +42,11 @@ function App() {
         <Route path="/videos/:videoId" element={<VideoPlayer />} />
       </Route>
 
+      {/* News Article page - protected, no navbar */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/news/:articleId" element={<NewsArticlePage />} />
+      </Route>
+
       {/* User Profile pages - protected, no navbar */}
       <Route element={<ProtectedRoute />}>
         <Route path="users/:username" element={<UserPage />} />
@@ -49,10 +55,9 @@ function App() {
 
       {/* Routes with Navbar and Footer */}
       <Route element={<MainLayout />}>
-        <Route path="search" element={<SearchResultsPage />} />
-        
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
+          <Route path="search" element={<SearchResultsPage />} />
           <Route path="me" element={<ProfilePage />} />
           <Route path="edit-profile" element={<EditProfilePage />} />
           <Route path="me/history" element={<HistoryPage />} />

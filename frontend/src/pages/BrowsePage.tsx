@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import homeBg from '../assets/home.png';
 import { getMyProfile, updateUserProfile, getSubscriptions } from '../services/userService';
-import { getFeed, uploadVideo, type Video } from '../services/videoService';
+import { getVideos, uploadVideo, deleteVideo, updateVideo, searchVideos, type Video } from '../services/videoService';
+import { getNews, searchNews, type NewsArticle } from '../services/newsService';
+import { getFavorites } from '../services/userService';
 import { AxiosError } from 'axios';
 
 interface UserProfile {
@@ -25,7 +27,7 @@ interface User {
 }
 
 const BrowsePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'videos' | 'news' | 'profile' | 'subscriptions' | 'upload'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'news' | 'myvideos' | 'profile' | 'subscriptions' | 'upload' | 'saved'>('videos');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -39,7 +41,36 @@ const BrowsePage: React.FC = () => {
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [subscriptions, setSubscriptions] = useState<User[]>([]);
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
-  
+  const [savedVideos, setSavedVideos] = useState<Video[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [savedPage, setSavedPage] = useState(0);
+  const [myVideosPage, setMyVideosPage] = useState(0);
+
+  // Videos search + filter state
+  const [videoSearchInput, setVideoSearchInput] = useState('');
+  const [videoSearchQuery, setVideoSearchQuery] = useState('');
+  const [videoSport, setVideoSport] = useState('');
+  const [videoPage, setVideoPage] = useState(0);
+  const VIDEO_PER_PAGE = 6;
+
+  // News state
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [loadingNews, setLoadingNews] = useState(false);
+  const [newsSport, setNewsSport] = useState('');
+  const [newsSearchInput, setNewsSearchInput] = useState('');
+  const [newsSearchQuery, setNewsSearchQuery] = useState('');
+  const [newsPage, setNewsPage] = useState(0);
+  const NEWS_PER_PAGE = 6;
+
+  // My Videos state
+  const [myVideos, setMyVideos] = useState<Video[]>([]);
+  const [loadingMyVideos, setLoadingMyVideos] = useState(false);
+  const [editVideoId, setEditVideoId] = useState<number | null>(null);
+  const [editVideoData, setEditVideoData] = useState({ title: '', description: '', sport: '', tags: '' });
+  const [editVideoSubmitting, setEditVideoSubmitting] = useState(false);
+  const [deleteVideoId, setDeleteVideoId] = useState<number | null>(null);
+  const [deletingVideo, setDeletingVideo] = useState(false);
+
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadThumbnail, setUploadThumbnail] = useState<File | null>(null);
@@ -61,6 +92,8 @@ const BrowsePage: React.FC = () => {
   const menuItems = [
     { id: 'videos', label: 'Videos', icon: '🎬' },
     { id: 'news', label: 'News', icon: '📰' },
+    { id: 'saved', label: 'Saved', icon: '🔖' },
+    { id: 'myvideos', label: 'My Videos', icon: '🎥' },
     { id: 'subscriptions', label: 'Subscriptions', icon: '⭐' },
     { id: 'upload', label: 'Upload', icon: '📤' },
     { id: 'profile', label: 'Profile', icon: '👤' },
@@ -85,16 +118,43 @@ const BrowsePage: React.FC = () => {
   };
 
   // Videos fetch function
-  const fetchVideos = async () => {
+  const fetchVideos = async (sport = '') => {
     setLoadingVideos(true);
     try {
-      const response = await getFeed(1, 12);
-      setVideos(response.data.data || []);
+      const response = await getVideos(1, 60, sport || undefined);
+      setVideos(response.data?.data?.videos || []);
     } catch (err) {
       console.error('Failed to fetch videos:', err);
     } finally {
       setLoadingVideos(false);
     }
+  };
+
+  const handleVideoSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = videoSearchInput.trim();
+    setVideoSearchQuery(q);
+    setVideoPage(0);
+    if (!q) {
+      fetchVideos(videoSport);
+      return;
+    }
+    setLoadingVideos(true);
+    try {
+      const response = await searchVideos(q, undefined, 50);
+      setVideos(response.data?.data?.hits || []);
+    } catch (err) {
+      console.error('Failed to search videos:', err);
+    } finally {
+      setLoadingVideos(false);
+    }
+  };
+
+  const handleVideoClearSearch = () => {
+    setVideoSearchInput('');
+    setVideoSearchQuery('');
+    setVideoPage(0);
+    fetchVideos(videoSport);
   };
 
   // Subscriptions fetch function
@@ -110,12 +170,102 @@ const BrowsePage: React.FC = () => {
     }
   };
 
+  const fetchSaved = async () => {
+    setLoadingSaved(true);
+    try {
+      const response = await getFavorites();
+      setSavedVideos(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch saved videos:', err);
+    } finally {
+      setLoadingSaved(false);
+    }
+  };
+
   // Fetch profile on component mount
   useEffect(() => {
     if (!profile) {
       fetchProfile();
     }
   }, []);
+
+  const fetchNews = async (sport = '') => {
+    setLoadingNews(true);
+    try {
+      const response = await getNews(1, 20, sport || undefined);
+      setNews(response.data?.articles || []);
+    } catch (err) {
+      console.error('Failed to fetch news:', err);
+    } finally {
+      setLoadingNews(false);
+    }
+  };
+
+  const handleNewsSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = newsSearchInput.trim();
+    setNewsSearchQuery(q);
+    setNewsPage(0);
+    if (!q) {
+      fetchNews(newsSport);
+      return;
+    }
+    setLoadingNews(true);
+    try {
+      const response = await searchNews(q, 50);
+      setNews(response.data?.hits || response.data || []);
+    } catch (err) {
+      console.error('Failed to search news:', err);
+    } finally {
+      setLoadingNews(false);
+    }
+  };
+
+  const handleNewsClearSearch = () => {
+    setNewsSearchInput('');
+    setNewsSearchQuery('');
+    setNewsPage(0);
+    fetchNews(newsSport);
+  };
+
+  const fetchMyVideos = async () => {
+    if (!profile) return;
+    setLoadingMyVideos(true);
+    try {
+      const { getUserVideos } = await import('../services/userService');
+      const response = await getUserVideos(profile.username);
+      setMyVideos(response.data?.videos || response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch my videos:', err);
+    } finally {
+      setLoadingMyVideos(false);
+    }
+  };
+
+  const handleEditVideoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editVideoId) return;
+    setEditVideoSubmitting(true);
+    try {
+      await updateVideo(editVideoId, editVideoData);
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to update video:', err);
+      setEditVideoSubmitting(false);
+    }
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!deleteVideoId) return;
+    setDeletingVideo(true);
+    try {
+      await deleteVideo(deleteVideoId);
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to delete video:', err);
+      setDeletingVideo(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'profile' && !profile) {
@@ -124,8 +274,23 @@ const BrowsePage: React.FC = () => {
       fetchVideos();
     } else if (activeTab === 'subscriptions' && subscriptions.length === 0) {
       fetchSubscriptions();
+    } else if (activeTab === 'news' && news.length === 0) {
+      fetchNews(newsSport);
+    } else if (activeTab === 'myvideos') {
+      fetchMyVideos();
+    } else if (activeTab === 'saved') {
+      fetchSaved();
     }
   }, [activeTab]);
+
+  // Poll My Videos every 4s while there are pending/processing videos
+  useEffect(() => {
+    if (activeTab !== 'myvideos') return;
+    const hasPending = myVideos.some(v => v.status === 'pending' || v.status === 'processing');
+    if (!hasPending) return;
+    const interval = setInterval(fetchMyVideos, 4000);
+    return () => clearInterval(interval);
+  }, [activeTab, myVideos]);
 
   const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
@@ -214,8 +379,8 @@ const BrowsePage: React.FC = () => {
   };
 
   const handleMenuClick = (id: string) => {
-    if (id === 'videos' || id === 'news' || id === 'profile' || id === 'subscriptions' || id === 'upload') {
-      setActiveTab(id as 'videos' | 'news' | 'profile' | 'subscriptions' | 'upload');
+    if (['videos', 'news', 'myvideos', 'profile', 'subscriptions', 'upload', 'saved'].includes(id)) {
+      setActiveTab(id as 'videos' | 'news' | 'myvideos' | 'profile' | 'subscriptions' | 'upload' | 'saved');
     }
   };
 
@@ -323,18 +488,15 @@ const BrowsePage: React.FC = () => {
       );
 
       setUploadSuccess(true);
-      setUploadFile(null);
-      setUploadThumbnail(null);
-      setUploadThumbnailPreview(null);
-      setUploadFormData({ title: '', description: '', sport: '', tags: '' });
-      setUploadProgress(0);
-
-      // Reload videos after upload
       setTimeout(() => {
         setUploadSuccess(false);
-        setActiveTab('videos');
-        fetchVideos();
-      }, 2000);
+        setUploadFile(null);
+        setUploadThumbnail(null);
+        setUploadThumbnailPreview(null);
+        setUploadFormData({ title: '', description: '', sport: '', tags: '' });
+        setUploadProgress(0);
+        setActiveTab('myvideos');
+      }, 1500);
     } catch (err) {
       const axiosError = err as AxiosError<{ error: string }>;
       if (axiosError.response?.data?.error) {
@@ -492,146 +654,335 @@ const BrowsePage: React.FC = () => {
       }}>
         {activeTab === 'videos' && (
           <div>
-            <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem' }}>
-              Discover Videos
-            </h2>
-            {loadingVideos ? (
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', padding: '2rem' }}>
-                <p>Loading videos...</p>
-              </div>
-            ) : videos.length > 0 ? (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                gap: '1rem',
-              }}>
-                {videos.map((video) => (
-                  <div
-                    key={video.id}
-                    onClick={() => navigate(`/videos/${video.id}`)}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>
+                {videoSearchQuery ? <>Discover Videos <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 400 }}>—</span> <span style={{ color: '#00d4ff' }}>{videoSearchQuery}</span></> : 'Discover Videos'}
+              </h2>
+              <form onSubmit={handleVideoSearch} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ position: 'absolute', left: '0.75rem', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+                  <input
+                    type="text"
+                    value={videoSearchInput}
+                    onChange={e => setVideoSearchInput(e.target.value)}
+                    placeholder="Search videos..."
                     style={{
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      backdropFilter: 'blur(12px)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
+                      paddingLeft: '2.2rem', paddingRight: videoSearchInput ? '2rem' : '0.75rem',
+                      paddingTop: '0.45rem', paddingBottom: '0.45rem',
+                      background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '20px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', width: '220px',
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.3)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    {/* Thumbnail */}
-                    <div style={{
-                      position: 'relative',
-                      width: '100%',
-                      paddingBottom: '56.25%', // 16:9 aspect ratio
-                      overflow: 'hidden',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                    }}>
-                      <img
-                        src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`}
-                        alt={video.title}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
-                      {/* Play button overlay */}
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(0, 0, 0, 0.4)',
-                        opacity: 0,
-                        transition: 'opacity 0.2s ease',
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '0'}
-                      >
-                        <div style={{
-                          width: '50px',
-                          height: '50px',
-                          background: 'rgba(230, 57, 70, 0.9)',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.5rem',
-                        }}>
-                          ▶
-                        </div>
-                      </div>
-                      {/* Duration badge */}
-                      {video.duration > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '0.5rem',
-                          right: '0.5rem',
-                          background: 'rgba(0, 0, 0, 0.8)',
-                          color: '#ffffff',
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                        }}>
-                          {Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Video title */}
-                    <div style={{ padding: '0.6rem 0.8rem' }}>
-                      <h3 style={{
-                        color: '#ffffff',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        margin: 0,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}>
-                        {video.title}
-                      </h3>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  />
+                  {videoSearchInput && (
+                    <button type="button" onClick={handleVideoClearSearch}
+                      style={{ position: 'absolute', right: '0.5rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button type="submit"
+                  style={{ padding: '0.45rem 1rem', background: '#008ddf', border: 'none', borderRadius: '20px', color: '#ffffff', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                  Search
+                </button>
+              </form>
+            </div>
+            {/* Sport filters */}
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+              {['', 'football', 'basketball', 'tennis', 'boxing', 'cycling', 'rugby'].map(sport => (
+                <button key={sport} onClick={() => { setVideoSport(sport); setVideoPage(0); setVideoSearchInput(''); setVideoSearchQuery(''); fetchVideos(sport); }}
+                  style={{ padding: '0.3rem 0.8rem', background: videoSport === sport ? '#008ddf' : 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '20px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: videoSport === sport ? 700 : 400 }}>
+                  {sport || 'All'}
+                </button>
+              ))}
+            </div>
+            {loadingVideos ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', padding: '2rem' }}>Loading videos...</div>
+            ) : videos.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '2rem' }}>No videos available.</div>
             ) : (
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', padding: '2rem' }}>
-                <p>No videos available</p>
+              <div style={{ position: 'relative', minHeight: '560px', display: 'flex', alignItems: 'flex-start' }}>
+                {/* Left arrow */}
+                <button onClick={() => setVideoPage(p => Math.max(0, p - 1))} disabled={videoPage === 0}
+                  style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: videoPage === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: videoPage === 0 ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: videoPage === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ‹
+                </button>
+                {/* Grid: 2 rows × 3 cols */}
+                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', paddingLeft: '52px', paddingRight: '52px' }}>
+                  {videos.slice(videoPage * VIDEO_PER_PAGE, videoPage * VIDEO_PER_PAGE + VIDEO_PER_PAGE).map(video => (
+                    <div key={video.id} onClick={() => navigate(`/videos/${video.id}`)}
+                      style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column' }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                      {/* Thumbnail */}
+                      <div style={{ position: 'relative', width: '100%', height: '185px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>
+                        <img src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`} alt={video.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {/* Play overlay */}
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s' }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
+                          <div style={{ width: '46px', height: '46px', background: 'rgba(230,57,70,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>▶</div>
+                        </div>
+                        {video.duration > 0 && (
+                          <div style={{ position: 'absolute', bottom: '0.4rem', right: '0.4rem', background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '0.2rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
+                            {Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
+                          </div>
+                        )}
+                      </div>
+                      {/* Title */}
+                      <div style={{ padding: '0.6rem 0.75rem' }}>
+                        <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {video.title}
+                        </h3>
+                        {video.sport && (
+                          <span style={{ display: 'inline-block', marginTop: '0.3rem', background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 600, textTransform: 'capitalize' }}>{video.sport}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Right arrow */}
+                <button onClick={() => setVideoPage(p => p + 1)} disabled={(videoPage + 1) * VIDEO_PER_PAGE >= videos.length}
+                  style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: (videoPage + 1) * VIDEO_PER_PAGE >= videos.length ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: (videoPage + 1) * VIDEO_PER_PAGE >= videos.length ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: (videoPage + 1) * VIDEO_PER_PAGE >= videos.length ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ›
+                </button>
               </div>
             )}
           </div>
         )}
         {activeTab === 'news' && (
-          <div style={{
-            padding: '2rem',
-            textAlign: 'center',
-            color: '#ffffff',
-          }}>
-            <p style={{ fontSize: '1.2rem', opacity: 0.7 }}>News coming soon...</p>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>
+                {newsSearchQuery ? <>Sports News <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 400 }}>—</span> <span style={{ color: '#00d4ff' }}>{newsSearchQuery}</span></> : 'Sports News'}
+              </h2>
+              <form onSubmit={handleNewsSearch} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ position: 'absolute', left: '0.75rem', color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+                  <input
+                    type="text"
+                    value={newsSearchInput}
+                    onChange={e => setNewsSearchInput(e.target.value)}
+                    placeholder="Search news..."
+                    style={{
+                      paddingLeft: '2.2rem', paddingRight: newsSearchInput ? '2rem' : '0.75rem',
+                      paddingTop: '0.45rem', paddingBottom: '0.45rem',
+                      background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '20px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', width: '220px',
+                    }}
+                  />
+                  {newsSearchInput && (
+                    <button type="button" onClick={handleNewsClearSearch}
+                      style={{ position: 'absolute', right: '0.5rem', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button type="submit"
+                  style={{ padding: '0.45rem 1rem', background: '#008ddf', border: 'none', borderRadius: '20px', color: '#ffffff', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                  Search
+                </button>
+              </form>
+            </div>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+              {['', 'football', 'basketball', 'tennis', 'boxing', 'cycling', 'rugby'].map(sport => (
+                <button key={sport} onClick={() => { setNewsSport(sport); setNewsPage(0); setNewsSearchInput(''); setNewsSearchQuery(''); fetchNews(sport); }}
+                  style={{ padding: '0.3rem 0.8rem', background: newsSport === sport ? '#008ddf' : 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#ffffff', borderRadius: '20px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: newsSport === sport ? 700 : 400 }}>
+                  {sport || 'All'}
+                </button>
+              ))}
+            </div>
+            {loadingNews ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '3rem' }}>Loading news...</div>
+            ) : news.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '3rem' }}>No news articles available.</div>
+            ) : (
+              <div style={{ position: 'relative', minHeight: '560px', display: 'flex', alignItems: 'flex-start' }}>
+                {/* Left arrow - fixed vertical center */}
+                <button
+                  onClick={() => setNewsPage(p => Math.max(0, p - 1))}
+                  disabled={newsPage === 0}
+                  style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: newsPage === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: newsPage === 0 ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: newsPage === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ‹
+                </button>
+
+                {/* Grid: 2 rows × 3 cols */}
+                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', paddingLeft: '52px', paddingRight: '52px' }}>
+                  {news.slice(newsPage * NEWS_PER_PAGE, newsPage * NEWS_PER_PAGE + NEWS_PER_PAGE).map(article => (
+                    <Link key={article.id} to={`/news/${article.id}`} style={{ textDecoration: 'none' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s, border-color 0.2s', height: '100%' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,212,255,0.3)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
+                        <div style={{ width: '100%', height: '155px', overflow: 'hidden', flexShrink: 0 }}>
+                          {article.image_url ? (
+                            <img src={article.image_url} alt={article.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,141,223,0.3) 0%, rgba(0,212,255,0.1) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
+                              {article.sport === 'football' ? '⚽' : article.sport === 'basketball' ? '🏀' : article.sport === 'tennis' ? '🎾' : article.sport === 'boxing' ? '🥊' : article.sport === 'cycling' ? '🚴' : article.sport === 'rugby' ? '🏉' : '🏆'}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ padding: '0.6rem 0.75rem' }}>
+                          {article.sport && (
+                            <span style={{ background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.15rem 0.45rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 600, textTransform: 'capitalize' }}>{article.sport}</span>
+                          )}
+                          <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 700, margin: '0.4rem 0 0.35rem', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{article.title}</h3>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)' }}>
+                            <span>{article.source}</span>
+                            <span>{new Date(article.published_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                {/* Right arrow - fixed vertical center */}
+                <button
+                  onClick={() => setNewsPage(p => p + 1)}
+                  disabled={(newsPage + 1) * NEWS_PER_PAGE >= news.length}
+                  style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: (newsPage + 1) * NEWS_PER_PAGE >= news.length ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: (newsPage + 1) * NEWS_PER_PAGE >= news.length ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: (newsPage + 1) * NEWS_PER_PAGE >= news.length ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ›
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'myvideos' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>My Videos</h2>
+            </div>
+            <div style={{ marginBottom: '1.5rem', height: '30px' }} />
+            {loadingMyVideos ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', padding: '3rem' }}>Loading...</div>
+            ) : myVideos.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '4rem' }}>
+                <p style={{ marginBottom: '1rem' }}>You haven't uploaded any videos yet.</p>
+                <button onClick={() => setActiveTab('upload')} style={{ padding: '0.6rem 1.5rem', background: '#008ddf', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Upload a Video</button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', minHeight: '420px', display: 'flex', alignItems: 'flex-start' }}>
+                {/* Left arrow */}
+                <button onClick={() => setMyVideosPage(p => Math.max(0, p - 1))} disabled={myVideosPage === 0}
+                  style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: myVideosPage === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: myVideosPage === 0 ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: myVideosPage === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ‹
+                </button>
+                {/* Grid: 2 rows × 3 cols */}
+                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', paddingLeft: '52px', paddingRight: '52px' }}>
+                  {myVideos.slice(myVideosPage * VIDEO_PER_PAGE, myVideosPage * VIDEO_PER_PAGE + VIDEO_PER_PAGE).map(video => (
+                    <div key={video.id}
+                      style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'all 0.2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                      {/* Thumbnail */}
+                      <div onClick={() => navigate(`/videos/${video.id}`)}
+                        style={{ position: 'relative', width: '100%', height: '130px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', flexShrink: 0, cursor: 'pointer' }}>
+                        <img src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`} alt={video.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s' }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
+                          <div style={{ width: '36px', height: '36px', background: 'rgba(230,57,70,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>▶</div>
+                        </div>
+                        {video.duration > 0 && (
+                          <div style={{ position: 'absolute', bottom: '0.3rem', right: '0.3rem', background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 600 }}>
+                            {Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
+                          </div>
+                        )}
+                      </div>
+                      {/* Info + actions */}
+                      <div style={{ padding: '0.45rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <h3 style={{ color: '#ffffff', fontSize: '0.75rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {video.title}
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem' }}>
+                          {video.status === 'pending' || video.status === 'processing' ? (
+                            <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', padding: '0.1rem 0.35rem', borderRadius: '10px', fontSize: '0.6rem', fontWeight: 600 }}>
+                              ⏳ {video.status === 'processing' ? 'Processing...' : 'Pending...'}
+                            </span>
+                          ) : video.sport ? (
+                            <span style={{ background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.35rem', borderRadius: '10px', fontSize: '0.6rem', fontWeight: 600, textTransform: 'capitalize' }}>{video.sport}</span>
+                          ) : <span />}
+                          <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)' }}>{video.views_count || 0} views</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            onClick={() => { setEditVideoId(video.id); setEditVideoData({ title: video.title, description: video.description || '', sport: video.sport || '', tags: video.tags || '' }); }}
+                            style={{ flex: 1, padding: '0.25rem 0', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#ffffff', borderRadius: '6px', fontSize: '0.68rem', cursor: 'pointer' }}>
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteVideoId(video.id)}
+                            style={{ flex: 1, padding: '0.25rem 0', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.25)', color: '#fca5a5', borderRadius: '6px', fontSize: '0.68rem', cursor: 'pointer' }}>
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Right arrow */}
+                <button onClick={() => setMyVideosPage(p => p + 1)} disabled={(myVideosPage + 1) * VIDEO_PER_PAGE >= myVideos.length}
+                  style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: (myVideosPage + 1) * VIDEO_PER_PAGE >= myVideos.length ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: (myVideosPage + 1) * VIDEO_PER_PAGE >= myVideos.length ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: (myVideosPage + 1) * VIDEO_PER_PAGE >= myVideos.length ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ›
+                </button>
+              </div>
+            )}
+
+            {/* Edit Video Modal */}
+            {editVideoId !== null && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}
+                onClick={e => { if (e.target === e.currentTarget) setEditVideoId(null); }}>
+                <div style={{ background: 'rgba(18,18,28,0.98)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '480px', color: '#ffffff' }}>
+                  <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.2rem', fontWeight: 700 }}>Edit Video</h2>
+                  <form onSubmit={handleEditVideoSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {(['title', 'sport', 'tags'] as const).map(key => (
+                      <div key={key}>
+                        <label style={{ display: 'block', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.3rem', textTransform: 'capitalize' }}>{key}</label>
+                        <input type="text" value={editVideoData[key]}
+                          onChange={e => setEditVideoData(prev => ({ ...prev, [key]: e.target.value }))}
+                          style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none' }} />
+                      </div>
+                    ))}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.3rem' }}>Description</label>
+                      <textarea rows={4} value={editVideoData.description}
+                        onChange={e => setEditVideoData(prev => ({ ...prev, description: e.target.value }))}
+                        style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none', resize: 'vertical' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => setEditVideoId(null)}
+                        style={{ padding: '0.5rem 1.1rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
+                      <button type="submit" disabled={editVideoSubmitting}
+                        style={{ padding: '0.5rem 1.2rem', background: '#008ddf', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: editVideoSubmitting ? 'not-allowed' : 'pointer', opacity: editVideoSubmitting ? 0.6 : 1 }}>
+                        {editVideoSubmitting ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Delete Video Confirm Modal */}
+            {deleteVideoId !== null && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}
+                onClick={e => { if (e.target === e.currentTarget) setDeleteVideoId(null); }}>
+                <div style={{ background: 'rgba(18,18,28,0.98)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '380px', color: '#ffffff', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🗑️</div>
+                  <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 700 }}>Delete Video?</h2>
+                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.88rem', margin: '0 0 1.5rem' }}>This action cannot be undone.</p>
+                  <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
+                    <button onClick={() => setDeleteVideoId(null)}
+                      style={{ padding: '0.5rem 1.3rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={handleDeleteVideo} disabled={deletingVideo}
+                      style={{ padding: '0.5rem 1.3rem', background: 'rgba(248,113,113,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: deletingVideo ? 'not-allowed' : 'pointer', opacity: deletingVideo ? 0.6 : 1 }}>
+                      {deletingVideo ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'subscriptions' && (
@@ -1025,6 +1376,70 @@ const BrowsePage: React.FC = () => {
               )
             ) : (
               <div style={{ color: '#f87171' }}>Failed to load profile</div>
+            )}
+          </div>
+        )}
+        {activeTab === 'saved' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ color: '#ffffff', fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Saved Videos</h2>
+            </div>
+            <div style={{ marginBottom: '1.5rem', height: '30px' }} />
+            {loadingSaved ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', padding: '2rem' }}>Loading saved videos...</div>
+            ) : savedVideos.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: '4rem' }}>
+                <p style={{ fontSize: '1rem', marginBottom: '0.4rem' }}>No saved videos yet.</p>
+                <p style={{ fontSize: '0.85rem' }}>Save a video from the player to find it here.</p>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', minHeight: '560px', display: 'flex', alignItems: 'flex-start' }}>
+                {/* Left arrow */}
+                <button onClick={() => setSavedPage(p => Math.max(0, p - 1))} disabled={savedPage === 0}
+                  style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: savedPage === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: savedPage === 0 ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: savedPage === 0 ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ‹
+                </button>
+                {/* Grid: 2 rows × 3 cols */}
+                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', paddingLeft: '52px', paddingRight: '52px' }}>
+                  {savedVideos.slice(savedPage * VIDEO_PER_PAGE, savedPage * VIDEO_PER_PAGE + VIDEO_PER_PAGE).map(video => (
+                    <div key={video.id} onClick={() => navigate(`/videos/${video.id}`)}
+                      style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', flexDirection: 'column' }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                      {/* Thumbnail */}
+                      <div style={{ position: 'relative', width: '100%', height: '185px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>
+                        <img src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`} alt={video.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {/* Play overlay */}
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s' }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
+                          <div style={{ width: '46px', height: '46px', background: 'rgba(230,57,70,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem' }}>▶</div>
+                        </div>
+                        {video.duration > 0 && (
+                          <div style={{ position: 'absolute', bottom: '0.4rem', right: '0.4rem', background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '0.2rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
+                            {Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
+                          </div>
+                        )}
+                      </div>
+                      {/* Info */}
+                      <div style={{ padding: '0.6rem 0.75rem' }}>
+                        <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {video.title}
+                        </h3>
+                        {video.sport && (
+                          <span style={{ display: 'inline-block', marginTop: '0.3rem', background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 600, textTransform: 'capitalize' }}>{video.sport}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Right arrow */}
+                <button onClick={() => setSavedPage(p => p + 1)} disabled={(savedPage + 1) * VIDEO_PER_PAGE >= savedVideos.length}
+                  style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1, width: '40px', height: '40px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)', background: (savedPage + 1) * VIDEO_PER_PAGE >= savedVideos.length ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)', color: (savedPage + 1) * VIDEO_PER_PAGE >= savedVideos.length ? 'rgba(255,255,255,0.2)' : '#ffffff', fontSize: '1.1rem', cursor: (savedPage + 1) * VIDEO_PER_PAGE >= savedVideos.length ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
+                  ›
+                </button>
+              </div>
             )}
           </div>
         )}

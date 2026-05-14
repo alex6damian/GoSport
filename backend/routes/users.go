@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"github.com/alex6damian/GoSport/backend/services"
 	"github.com/alex6damian/GoSport/backend/utils"
 	"github.com/alex6damian/GoSport/pkg/database"
 	"github.com/alex6damian/GoSport/pkg/models"
@@ -187,18 +188,20 @@ func GetUserVideos(c *fiber.Ctx) error {
 
 	// Get total count
 	var total int64
-	database.DB.Model(&models.Video{}).Where("user_id = ? AND status = ?", user.ID, "ready").Count(&total)
+	database.DB.Model(&models.Video{}).Where("user_id = ?", user.ID).Count(&total)
 
-	// Get videos
+	// Get videos (all statuses so owner can see pending/processing)
 	var videos []models.Video
 	if err := database.DB.
-		Where("user_id = ? AND status = ?", user.ID, "ready").
+		Where("user_id = ?", user.ID).
 		Order("created_at DESC").
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Find(&videos).Error; err != nil {
 		return utils.ErrorResponse(c, "Failed to fetch videos", fiber.StatusInternalServerError)
 	}
+
+	services.GenerateThumbnailURLs(videos)
 
 	// Create pagination metadata
 	paginationMeta := utils.CreatePaginationMeta(pagination.Page, pagination.Limit, total)

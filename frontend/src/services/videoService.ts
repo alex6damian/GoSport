@@ -34,6 +34,12 @@ export const getFeed = (page: number = 1, limit: number = 12) => {
   });
 };
 
+export const getVideos = (page: number = 1, limit: number = 12, sport?: string) => {
+  return api.get('/videos', {
+    params: { page, limit, sport: sport || undefined },
+  });
+};
+
 export const searchVideos = (q: string, sport?: string, limit: number = 20) => {
   return api.get('/search/videos', {
     params: { q, sport, limit },
@@ -130,6 +136,48 @@ export const addReply = async (commentId: number, content: string) => {
 // PUT /api/v1/comments/:commentId
 export const updateComment = async (commentId: number, content: string) => {
   const response = await api.put(`/comments/${commentId}`, { content });
+  return response.data;
+};
+
+// PUT /api/v1/videos/:videoId
+export const updateVideo = async (videoId: number, data: { title?: string; description?: string; sport?: string; tags?: string }) => {
+  const response = await api.put(`/videos/${videoId}`, data);
+  return response.data;
+};
+
+// DELETE /api/v1/videos/:videoId
+export const deleteVideo = async (videoId: number) => {
+  const response = await api.delete(`/videos/${videoId}`);
+  return response.data;
+};
+
+// POST /api/v1/videos/:videoId/favorite - Toggle favorite
+export const toggleFavorite = async (videoId: number) => {
+  const response = await api.post(`/videos/${videoId}/favorite`);
+  return response.data;
+};
+
+// GET /api/v1/videos/:videoId/favorite - Check if favorited
+export const checkIfFavorited = async (videoId: number) => {
+  const response = await api.get(`/videos/${videoId}/favorite`);
+  return response.data;
+};
+
+// POST /api/v1/videos/:videoId/progress - Update watch progress
+export const updateWatchProgress = async (videoId: number, duration: number) => {
+  const response = await api.post(`/videos/${videoId}/progress`, { duration });
+  return response.data;
+};
+
+// GET /api/v1/videos/:videoId/stats
+export const getVideoStats = async (videoId: number) => {
+  const response = await api.get(`/videos/${videoId}/stats`);
+  return response.data;
+};
+
+// GET /api/v1/videos/:videoId/likes
+export const getVideoLikes = async (videoId: number, page = 1, limit = 20) => {
+  const response = await api.get(`/videos/${videoId}/likes`, { params: { page, limit } });
   return response.data;
 };
 

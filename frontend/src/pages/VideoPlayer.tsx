@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import homeBg from '../assets/home.png';
-import { getVideoDetails, likeVideo, unlikeVideo, checkIfVideoLiked, recordVideoView, getVideoComments, addComment, deleteComment, getCommentReplies, addReply, updateComment, getFeed, searchVideos } from '../services/videoService';
+import { getVideoDetails, likeVideo, unlikeVideo, checkIfVideoLiked, recordVideoView, getVideoComments, addComment, deleteComment, getCommentReplies, addReply, updateComment, getFeed, searchVideos, toggleFavorite, checkIfFavorited, updateVideo, deleteVideo, updateWatchProgress } from '../services/videoService';
 import type { Video } from '../services/videoService';
 import { subscribeToUser, unsubscribeFromUser, checkSubscription } from '../services/userService';
 
@@ -46,6 +46,7 @@ interface VideoDetails {
 const VideoPlayer: React.FC = () => {
   const { videoId } = useParams<{ videoId: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const viewRecorded = useRef<Set<string>>(new Set());
   const [video, setVideo] = useState<VideoDetails | null>(null);
   const [videoURL, setVideoURL] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -70,6 +71,14 @@ const VideoPlayer: React.FC = () => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favoriting, setFavoriting] = useState(false);
+  const [showEditVideo, setShowEditVideo] = useState(false);
+  const [editVideoData, setEditVideoData] = useState({ title: '', description: '', sport: '', tags: '' });
+  const [editVideoSubmitting, setEditVideoSubmitting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingVideo, setDeletingVideo] = useState(false);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
 
@@ -95,11 +104,14 @@ const VideoPlayer: React.FC = () => {
         setVideoURL(response.video_url || '');
         setLikesCount(videoData.likes_count || 0);
 
-        // Record view
-        try {
-          await recordVideoView(Number(videoId));
-        } catch (err) {
-          console.error('Failed to record view:', err);
+        // Record view (guard against StrictMode double-invoke)
+        if (!viewRecorded.current.has(videoId)) {
+          viewRecorded.current.add(videoId);
+          try {
+            await recordVideoView(Number(videoId));
+          } catch (err) {
+            console.error('Failed to record view:', err);
+          }
         }
 
         // Check subscription status if user is logged in
@@ -119,6 +131,16 @@ const VideoPlayer: React.FC = () => {
             setIsLiked(likeResponse?.is_liked || false);
           } catch (err) {
             console.error('Failed to check like status:', err);
+          }
+        }
+
+        // Check if video is favorited
+        if (token) {
+          try {
+            const favResponse = await checkIfFavorited(Number(videoId));
+            setIsFavorited(favResponse?.is_favorited || false);
+          } catch (err) {
+            console.error('Failed to check favorite status:', err);
           }
         }
       } catch (err) {
@@ -155,6 +177,35 @@ const VideoPlayer: React.FC = () => {
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [openMenuId]);
+
+  // Watch progress: send every 15s while playing
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl || !videoId || !token) return;
+
+    const startTimer = () => {
+      progressTimerRef.current = setInterval(() => {
+        if (videoEl && !videoEl.paused && !videoEl.ended) {
+          updateWatchProgress(Number(videoId), Math.floor(videoEl.currentTime)).catch(() => {});
+        }
+      }, 15000);
+    };
+
+    const stopTimer = () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+
+    videoEl.addEventListener('play', startTimer);
+    videoEl.addEventListener('pause', stopTimer);
+    videoEl.addEventListener('ended', stopTimer);
+
+    return () => {
+      stopTimer();
+      videoEl.removeEventListener('play', startTimer);
+      videoEl.removeEventListener('pause', stopTimer);
+      videoEl.removeEventListener('ended', stopTimer);
+    };
+  }, [videoId, token]);
 
   useEffect(() => {
     if (!video) return;
@@ -332,6 +383,47 @@ const VideoPlayer: React.FC = () => {
       console.error('Failed to update subscription:', err);
     } finally {
       setSubscribing(false);
+    }
+  };
+
+  const handleFavorite = async () => {
+    if (!token || !video) return;
+    setFavoriting(true);
+    try {
+      const res = await toggleFavorite(video.id);
+      setIsFavorited(res?.is_favorited ?? !isFavorited);
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+    } finally {
+      setFavoriting(false);
+    }
+  };
+
+  const handleEditVideoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!video) return;
+    setEditVideoSubmitting(true);
+    try {
+      await updateVideo(video.id, editVideoData);
+      setVideo(prev => prev ? { ...prev, ...editVideoData } : null);
+      setShowEditVideo(false);
+    } catch (err) {
+      console.error('Failed to update video:', err);
+    } finally {
+      setEditVideoSubmitting(false);
+    }
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!video) return;
+    setDeletingVideo(true);
+    try {
+      await deleteVideo(video.id);
+      navigate('/browse');
+    } catch (err) {
+      console.error('Failed to delete video:', err);
+      setDeletingVideo(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -523,35 +615,9 @@ const VideoPlayer: React.FC = () => {
               >
                 Your browser does not support the video tag.
               </video>
-              <button
-                onClick={() => videoRef.current?.requestFullscreen()}
-                title="Fullscreen"
-                style={{
-                  position: 'absolute',
-                  bottom: '0.6rem',
-                  right: '0.6rem',
-                  background: 'rgba(0,0,0,0.55)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#ffffff',
-                  fontSize: '1rem',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease',
-                  zIndex: 10,
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.8)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.55)'}
-              >
-                ⛶
-              </button>
             </div>
 
-            {/* Title + stats + like */}
+            {/* Title + stats + like + favorite + owner actions */}
             <div style={{ color: '#ffffff' }}>
               <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0.5rem' }}>
                 {video.title}
@@ -564,23 +630,43 @@ const VideoPlayer: React.FC = () => {
                   {video.sport && <><span>•</span><span style={{ color: '#00d4ff' }}>{video.sport}</span></>}
                 </div>
                 {token && (
-                  <button
-                    onClick={handleLike}
-                    disabled={liking}
-                    style={{
-                      padding: '0.4rem 1rem',
-                      background: isLiked ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.1)',
-                      border: isLiked ? '1px solid rgba(248,113,113,0.3)' : '1px solid rgba(255,255,255,0.2)',
-                      color: isLiked ? '#fca5a5' : '#ffffff',
-                      borderRadius: '8px',
-                      cursor: liking ? 'not-allowed' : 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      opacity: liking ? 0.6 : 1,
-                    }}
-                  >
-                    {isLiked ? '❤️' : '🤍'} {likesCount}
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={handleLike}
+                      disabled={liking}
+                      style={{
+                        padding: '0.4rem 1rem',
+                        background: isLiked ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.1)',
+                        border: isLiked ? '1px solid rgba(248,113,113,0.3)' : '1px solid rgba(255,255,255,0.2)',
+                        color: isLiked ? '#fca5a5' : '#ffffff',
+                        borderRadius: '8px',
+                        cursor: liking ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        opacity: liking ? 0.6 : 1,
+                      }}
+                    >
+                      {isLiked ? '❤️' : '🤍'} {likesCount}
+                    </button>
+                    <button
+                      onClick={handleFavorite}
+                      disabled={favoriting}
+                      title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                      style={{
+                        padding: '0.4rem 1rem',
+                        background: isFavorited ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.1)',
+                        border: isFavorited ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(255,255,255,0.2)',
+                        color: isFavorited ? '#fbbf24' : '#ffffff',
+                        borderRadius: '8px',
+                        cursor: favoriting ? 'not-allowed' : 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        opacity: favoriting ? 0.6 : 1,
+                      }}
+                    >
+                      {isFavorited ? '★' : '☆'} Save
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1060,24 +1146,11 @@ const VideoPlayer: React.FC = () => {
                             border: '1px solid rgba(255,255,255,0.1)',
                             flexShrink: 0,
                           }}>
-                            {vid.thumbnail ? (
-                              <img
-                                src={vid.thumbnail}
-                                alt={vid.title}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            ) : (
-                              <div style={{
-                                width: '100%',
-                                height: '100%',
-                                background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(118,75,162,0.2))',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}>
-                                <span style={{ fontSize: '2rem', opacity: 0.2 }}>▶</span>
-                              </div>
-                            )}
+                            <img
+                              src={vid.thumbnail || `https://i.pravatar.cc/300?u=${vid.id}`}
+                              alt={vid.title}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
                           </div>
 
                           {/* Title at bottom */}
@@ -1132,6 +1205,74 @@ const VideoPlayer: React.FC = () => {
         </div>
         )}
       </div>
+
+      {/* Edit Video Modal */}
+      {showEditVideo && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowEditVideo(false); }}>
+          <div style={{ background: 'rgba(18,18,28,0.98)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '480px', color: '#ffffff' }}>
+            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.2rem', fontWeight: 700 }}>Edit Video</h2>
+            <form onSubmit={handleEditVideoSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {[
+                { label: 'Title', key: 'title', type: 'text' },
+                { label: 'Sport', key: 'sport', type: 'text' },
+                { label: 'Tags', key: 'tags', type: 'text' },
+              ].map(({ label, key, type }) => (
+                <div key={key}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.3rem' }}>{label}</label>
+                  <input
+                    type={type}
+                    value={editVideoData[key as keyof typeof editVideoData]}
+                    onChange={e => setEditVideoData(prev => ({ ...prev, [key]: e.target.value }))}
+                    style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none' }}
+                  />
+                </div>
+              ))}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginBottom: '0.3rem' }}>Description</label>
+                <textarea
+                  rows={4}
+                  value={editVideoData.description}
+                  onChange={e => setEditVideoData(prev => ({ ...prev, description: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', color: '#fff', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none', resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowEditVideo(false)}
+                  style={{ padding: '0.5rem 1.1rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={editVideoSubmitting}
+                  style={{ padding: '0.5rem 1.2rem', background: '#008ddf', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: editVideoSubmitting ? 'not-allowed' : 'pointer', opacity: editVideoSubmitting ? 0.6 : 1 }}>
+                  {editVideoSubmitting ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Video Confirm Modal */}
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowDeleteConfirm(false); }}>
+          <div style={{ background: 'rgba(18,18,28,0.98)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '380px', color: '#ffffff', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🗑️</div>
+            <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 700 }}>Delete Video?</h2>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.88rem', margin: '0 0 1.5rem' }}>This action cannot be undone. The video will be permanently deleted.</p>
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center' }}>
+              <button onClick={() => setShowDeleteConfirm(false)}
+                style={{ padding: '0.5rem 1.3rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleDeleteVideo} disabled={deletingVideo}
+                style={{ padding: '0.5rem 1.3rem', background: 'rgba(248,113,113,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: deletingVideo ? 'not-allowed' : 'pointer', opacity: deletingVideo ? 0.6 : 1 }}>
+                {deletingVideo ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

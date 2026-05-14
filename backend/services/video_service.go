@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/alex6damian/GoSport/pkg/config"
+	"github.com/alex6damian/GoSport/pkg/models"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 )
@@ -65,6 +66,20 @@ func GetVideoURL(objectName string, expires time.Duration) (string, error) {
 	}
 
 	return url.String(), nil
+}
+
+// GenerateThumbnailURLs replaces raw MinIO thumbnail keys with presigned URLs in-place.
+func GenerateThumbnailURLs(videos []models.Video) {
+	for i := range videos {
+		if videos[i].Thumbnail != "" {
+			url, err := GetVideoURL(videos[i].Thumbnail, 1*time.Hour)
+			if err != nil {
+				videos[i].Thumbnail = ""
+			} else {
+				videos[i].Thumbnail = url
+			}
+		}
+	}
 }
 
 // DeleteVideo removes a video from MinIO

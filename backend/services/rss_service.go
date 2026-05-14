@@ -64,9 +64,8 @@ func (s *RSSService) FetchAndStore(feedID uint) error {
 		err := s.DB.Where("source_url = ?", article.SourceURL).First(&existing).Error
 
 		if err == nil {
-			// Article exists - check if content changed
-			if existing.Title != article.Title || existing.Content != article.Content {
-				// Update existing article
+			// Article exists - update if content changed or image was missing
+			if existing.Title != article.Title || existing.Content != article.Content || (existing.ImageURL == "" && article.ImageURL != "") {
 				existing.Title = article.Title
 				existing.Content = article.Content
 				existing.Summary = article.Summary
@@ -77,7 +76,6 @@ func (s *RSSService) FetchAndStore(feedID uint) error {
 					continue
 				}
 
-				// Update in Meilisearch
 				go s.updateArticleInMeilisearch(existing)
 				log.Printf("🔄 Updated article: %s", existing.Title)
 			}
@@ -117,10 +115,20 @@ func (s *RSSService) ConvertToArticle(item *gofeed.Item, feed *models.RSSFeed) m
 
 	// Extract image URL from media content or enclosures
 	imageURL := ""
-	if item.Image != nil {
+	if item.Image != nil && item.Image.URL != "" {
 		imageURL = item.Image.URL
-	} else if item.Enclosures != nil && len(item.Enclosures) > 0 {
+	} else if len(item.Enclosures) > 0 && strings.HasPrefix(item.Enclosures[0].Type, "image/") {
 		imageURL = item.Enclosures[0].URL
+	} else if ext, ok := item.Extensions["media"]; ok {
+		if thumbs, ok := ext["thumbnail"]; ok && len(thumbs) > 0 {
+			if url, ok := thumbs[0].Attrs["url"]; ok {
+				imageURL = url
+			}
+		} else if contents, ok := ext["content"]; ok && len(contents) > 0 {
+			if url, ok := contents[0].Attrs["url"]; ok {
+				imageURL = url
+			}
+		}
 	}
 
 	// Extract author
@@ -129,18 +137,13 @@ func (s *RSSService) ConvertToArticle(item *gofeed.Item, feed *models.RSSFeed) m
 		author = item.Author.Name
 	}
 
-	// Get content or description
+	// Use the RSS description as summary, full content as content
+	summary := stripHTML(item.Description)
+
 	content := item.Content
 	if content == "" {
 		content = item.Description
 	}
-
-	// Generate summary (first 200 chars of content)
-	summary := content
-	if len(content) > 200 {
-		summary = content[:200] + "..."
-	}
-	summary = stripHTML(summary)
 
 	return models.NewsArticle{
 		Title:       item.Title,
@@ -236,16 +239,22 @@ func (s *RSSService) updateArticleInMeilisearch(article models.NewsArticle) {
 	}
 }
 
-// stripHTML removes HTML tags (basic)
+// stripHTML removes all HTML tags using a simple state machine
 func stripHTML(s string) string {
-	s = strings.ReplaceAll(s, "<p>", "")
-	s = strings.ReplaceAll(s, "</p>", " ")
-	s = strings.ReplaceAll(s, "<br>", " ")
-	s = strings.ReplaceAll(s, "<br/>", " ")
-	s = strings.ReplaceAll(s, "<div>", "")
-	s = strings.ReplaceAll(s, "</div>", " ")
-	s = strings.ReplaceAll(s, "<span>", "")
-	s = strings.ReplaceAll(s, "</span>", "")
-	// Add more as needed
-	return strings.TrimSpace(s)
+	var b strings.Builder
+	inTag := false
+	for _, r := range s {
+		switch {
+		case r == '<':
+			inTag = true
+		case r == '>':
+			inTag = false
+			b.WriteRune(' ')
+		case !inTag:
+			b.WriteRune(r)
+		}
+	}
+	// Collapse multiple spaces
+	result := strings.Join(strings.Fields(b.String()), " ")
+	return strings.TrimSpace(result)
 }

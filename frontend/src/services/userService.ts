@@ -59,3 +59,9 @@ export const checkSubscription = async (userId: number) => {
   const response = await api.get(`/users/${userId}/subscription`);
   return response.data;
 };
+
+// GET /api/v1/users/:userId/subscribers
+export const getSubscribers = async (userId: number) => {
+  const response = await api.get(`/users/${userId}/subscribers`);
+  return response.data;
+};

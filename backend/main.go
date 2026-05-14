@@ -112,13 +112,13 @@ func setupRoutes(app *fiber.App) {
 	log.Println("✅ Video routes registered")
 
 	// Video interaction routes
-	videos.Post("/:id/view", routes.TrackView) // Public - track anonymous views
+	videos.Post("/:id/view", middleware.OptionalAuthMiddleware, routes.TrackView)
 	videos.Post("/:id/progress", middleware.AuthMiddleware, routes.UpdateWatchProgress)
 	videos.Post("/:id/like", middleware.AuthMiddleware, routes.ToggleLike)
-	videos.Get("/:id/like", routes.CheckIfLiked)
+	videos.Get("/:id/like", middleware.OptionalAuthMiddleware, routes.CheckIfLiked)
 	videos.Get("/:id/likes", routes.GetVideoLikes)
 	videos.Post("/:id/favorite", middleware.AuthMiddleware, routes.ToggleFavorite)
-	videos.Get("/:id/favorite", routes.CheckIfFavorited)
+	videos.Get("/:id/favorite", middleware.OptionalAuthMiddleware, routes.CheckIfFavorited)
 	videos.Get("/:id/stats", routes.GetVideoStats)
 	log.Println("✅ Video interaction routes registered")
 
@@ -137,6 +137,7 @@ func setupRoutes(app *fiber.App) {
 	adminAuth.Delete("/feeds/:id", routes.DeleteRSSFeed)
 	adminAuth.Post("/feeds/:id/sync", routes.SyncRSSFeed)
 	adminAuth.Post("/feeds/sync-all", routes.SyncAllFeeds)
+	adminAuth.Post("/reindex", routes.ReindexAll)
 	log.Println("✅ Admin routes registered")
 
 	// Meilisearch routes
