@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import homeBg from '../assets/home.png';
+import NavButtons from '../components/NavButtons';
 import { getVideoDetails, likeVideo, unlikeVideo, checkIfVideoLiked, recordVideoView, getVideoComments, addComment, deleteComment, getCommentReplies, addReply, updateComment, getFeed, searchVideos, toggleFavorite, checkIfFavorited, updateVideo, deleteVideo, updateWatchProgress } from '../services/videoService';
 import type { Video } from '../services/videoService';
 import { subscribeToUser, unsubscribeFromUser, checkSubscription } from '../services/userService';
@@ -528,35 +529,7 @@ const VideoPlayer: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
       }}>
-        {/* Back button */}
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            position: 'absolute',
-            top: '2rem',
-            left: '2rem',
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#ffffff',
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            fontSize: '1.2rem',
-            zIndex: 10,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-          }}
-        >
-          ←
-        </button>
+        <NavButtons />
 
         {loading && !video && (
           <div style={{

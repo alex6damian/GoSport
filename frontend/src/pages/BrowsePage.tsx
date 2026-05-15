@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import homeBg from '../assets/home.png';
 import { getMyProfile, updateUserProfile, getSubscriptions } from '../services/userService';
@@ -6,6 +6,8 @@ import { getVideos, uploadVideo, deleteVideo, updateVideo, searchVideos, type Vi
 import { getNews, searchNews, type NewsArticle } from '../services/newsService';
 import { getFavorites } from '../services/userService';
 import { AxiosError } from 'axios';
+import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 interface UserProfile {
   id: number;
@@ -86,8 +88,23 @@ const BrowsePage: React.FC = () => {
     sport: '',
     tags: '',
   });
-  
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState('');
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const imgRef = useRef<HTMLImageElement>(null);
+
   const navigate = useNavigate();
+
+  const timeAgo = (dateStr: string) => {
+    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    if (diff < 2592000) return `${Math.floor(diff / 604800)}w ago`;
+    return `${Math.floor(diff / 2592000)}mo ago`;
+  };
 
   const menuItems = [
     { id: 'videos', label: 'Videos', icon: '🎬' },
@@ -192,7 +209,7 @@ const BrowsePage: React.FC = () => {
   const fetchNews = async (sport = '') => {
     setLoadingNews(true);
     try {
-      const response = await getNews(1, 20, sport || undefined);
+      const response = await getNews(1, 200, sport || undefined);
       setNews(response.data?.articles || []);
     } catch (err) {
       console.error('Failed to fetch news:', err);
@@ -432,10 +449,11 @@ const BrowsePage: React.FC = () => {
     if (files && files.length > 0) {
       const thumbnailFile = files[0];
       if (thumbnailFile.type.startsWith('image/')) {
-        setUploadThumbnail(thumbnailFile);
         const reader = new FileReader();
         reader.onloadend = () => {
-          setUploadThumbnailPreview(reader.result as string);
+          setCropSrc(reader.result as string);
+          setCropModalOpen(true);
+          setCrop(undefined);
         };
         reader.readAsDataURL(thumbnailFile);
         setUploadError(null);
@@ -444,6 +462,36 @@ const BrowsePage: React.FC = () => {
       }
     }
   };
+
+  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
+    const c = centerCrop(makeAspectCrop({ unit: '%', width: 100 }, 16 / 9, width, height), width, height);
+    setCrop(c);
+  }, []);
+
+  const handleCropConfirm = useCallback(() => {
+    if (!imgRef.current || !completedCrop) return;
+    const canvas = document.createElement('canvas');
+    const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
+    const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+    canvas.width = completedCrop.width * scaleX;
+    canvas.height = completedCrop.height * scaleY;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(
+      imgRef.current,
+      completedCrop.x * scaleX, completedCrop.y * scaleY,
+      completedCrop.width * scaleX, completedCrop.height * scaleY,
+      0, 0, canvas.width, canvas.height,
+    );
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const croppedFile = new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' });
+      setUploadThumbnail(croppedFile);
+      setUploadThumbnailPreview(canvas.toDataURL('image/jpeg', 0.95));
+      setCropModalOpen(false);
+    }, 'image/jpeg', 0.95);
+  }, [completedCrop]);
 
   const handleUploadFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setUploadFormData({
@@ -512,6 +560,7 @@ const BrowsePage: React.FC = () => {
   };
 
   return (
+    <>
     <div style={{
       position: 'fixed',
       top: 0,
@@ -669,7 +718,7 @@ const BrowsePage: React.FC = () => {
                     style={{
                       paddingLeft: '2.2rem', paddingRight: videoSearchInput ? '2rem' : '0.75rem',
                       paddingTop: '0.45rem', paddingBottom: '0.45rem',
-                      background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(15,15,25,0.85)', border: '1px solid rgba(255,255,255,0.25)',
                       borderRadius: '20px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', width: '220px',
                     }}
                   />
@@ -716,7 +765,7 @@ const BrowsePage: React.FC = () => {
                       {/* Thumbnail */}
                       <div style={{ position: 'relative', width: '100%', height: '185px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>
                         <img src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`} alt={video.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         {/* Play overlay */}
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s' }}
                           onMouseEnter={e => e.currentTarget.style.opacity = '1'}
@@ -730,13 +779,23 @@ const BrowsePage: React.FC = () => {
                         )}
                       </div>
                       {/* Title */}
-                      <div style={{ padding: '0.6rem 0.75rem' }}>
-                        <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <div style={{ padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
                           {video.title}
                         </h3>
-                        {video.sport && (
-                          <span style={{ display: 'inline-block', marginTop: '0.3rem', background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 600, textTransform: 'capitalize' }}>{video.sport}</span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem', marginTop: '0.1rem' }}>
+                          {video.user ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                              <img src={video.user.avatar || `https://i.pravatar.cc/40?u=${video.user.id}`} alt={video.user.username}
+                                style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.user.username}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', flexShrink: 0 }}>· {timeAgo(video.created_at)}</span>
+                            </div>
+                          ) : <span />}
+                          {video.sport && (
+                            <span style={{ background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.62rem', fontWeight: 600, textTransform: 'capitalize', flexShrink: 0 }}>{video.sport}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -767,7 +826,7 @@ const BrowsePage: React.FC = () => {
                     style={{
                       paddingLeft: '2.2rem', paddingRight: newsSearchInput ? '2rem' : '0.75rem',
                       paddingTop: '0.45rem', paddingBottom: '0.45rem',
-                      background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(15,15,25,0.85)', border: '1px solid rgba(255,255,255,0.25)',
                       borderRadius: '20px', color: '#ffffff', fontSize: '0.85rem', outline: 'none', width: '220px',
                     }}
                   />
@@ -815,7 +874,7 @@ const BrowsePage: React.FC = () => {
                         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
                         <div style={{ width: '100%', height: '155px', overflow: 'hidden', flexShrink: 0 }}>
                           {article.image_url ? (
-                            <img src={article.image_url} alt={article.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={article.image_url} alt={article.title} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                           ) : (
                             <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,141,223,0.3) 0%, rgba(0,212,255,0.1) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
                               {article.sport === 'football' ? '⚽' : article.sport === 'basketball' ? '🏀' : article.sport === 'tennis' ? '🎾' : article.sport === 'boxing' ? '🥊' : article.sport === 'cycling' ? '🚴' : article.sport === 'rugby' ? '🏉' : '🏆'}
@@ -879,7 +938,7 @@ const BrowsePage: React.FC = () => {
                       <div onClick={() => navigate(`/videos/${video.id}`)}
                         style={{ position: 'relative', width: '100%', height: '130px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', flexShrink: 0, cursor: 'pointer' }}>
                         <img src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`} alt={video.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s' }}
                           onMouseEnter={e => e.currentTarget.style.opacity = '1'}
                           onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
@@ -1409,7 +1468,7 @@ const BrowsePage: React.FC = () => {
                       {/* Thumbnail */}
                       <div style={{ position: 'relative', width: '100%', height: '185px', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>
                         <img src={video.thumbnail || `https://i.pravatar.cc/300?u=${video.id}`} alt={video.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                         {/* Play overlay */}
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s' }}
                           onMouseEnter={e => e.currentTarget.style.opacity = '1'}
@@ -1423,13 +1482,23 @@ const BrowsePage: React.FC = () => {
                         )}
                       </div>
                       {/* Info */}
-                      <div style={{ padding: '0.6rem 0.75rem' }}>
-                        <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <div style={{ padding: '0.6rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <h3 style={{ color: '#ffffff', fontSize: '0.8rem', fontWeight: 600, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textAlign: 'left' }}>
                           {video.title}
                         </h3>
-                        {video.sport && (
-                          <span style={{ display: 'inline-block', marginTop: '0.3rem', background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 600, textTransform: 'capitalize' }}>{video.sport}</span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.3rem', marginTop: '0.1rem' }}>
+                          {video.user ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+                              <img src={video.user.avatar || `https://i.pravatar.cc/40?u=${video.user.id}`} alt={video.user.username}
+                                style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.65rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.user.username}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', flexShrink: 0 }}>· {timeAgo(video.created_at)}</span>
+                            </div>
+                          ) : <span />}
+                          {video.sport && (
+                            <span style={{ background: 'rgba(0,212,255,0.15)', color: '#00d4ff', padding: '0.1rem 0.4rem', borderRadius: '10px', fontSize: '0.62rem', fontWeight: 600, textTransform: 'capitalize', flexShrink: 0 }}>{video.sport}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1552,72 +1621,42 @@ const BrowsePage: React.FC = () => {
 
                   {/* Thumbnail */}
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      color: 'rgba(255,255,255,0.8)',
-                      marginBottom: '0.4rem',
-                    }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: '0.4rem' }}>
                       Thumbnail Image
                     </label>
-                    <div style={{
-                      position: 'relative',
-                      border: '2px dashed rgba(255,255,255,0.3)',
-                      borderRadius: '10px',
-                      padding: '1.2rem 1rem',
-                      textAlign: 'center',
-                      background: 'rgba(255,255,255,0.05)',
-                      cursor: 'pointer',
-                      minHeight: '100px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleUploadThumbnailChange}
-                        disabled={uploading}
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          cursor: uploading ? 'not-allowed' : 'pointer',
-                          opacity: 0,
-                        }}
-                      />
+                    {/* Drop zone */}
+                    <div style={{ position: 'relative', border: '2px dashed rgba(255,255,255,0.3)', borderRadius: '10px', padding: '0.9rem 1rem', textAlign: 'center', background: 'rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60px' }}>
+                      <input type="file" accept="image/*" onChange={handleUploadThumbnailChange} disabled={uploading}
+                        style={{ position: 'absolute', inset: 0, cursor: uploading ? 'not-allowed' : 'pointer', opacity: 0 }} />
                       <div style={{ pointerEvents: 'none' }}>
                         {uploadThumbnailPreview ? (
-                          <div style={{ textAlign: 'center' }}>
-                            <img
-                              src={uploadThumbnailPreview}
-                              alt="Thumbnail preview"
-                              style={{
-                                maxWidth: '100%',
-                                maxHeight: '100px',
-                                borderRadius: '6px',
-                                marginBottom: '0.4rem',
-                              }}
-                            />
-                            <p style={{ color: '#008ddf', fontWeight: 500, margin: '0.1rem 0', fontSize: '0.7rem' }}>
-                              {uploadThumbnail?.name}
-                            </p>
-                          </div>
+                          <p style={{ color: '#00d4ff', fontWeight: 600, margin: 0, fontSize: '0.75rem' }}>✓ Thumbnail selected — click to change</p>
                         ) : (
-                          <>
-                            <div>
-                              <div style={{ fontSize: '1.5rem', marginBottom: '0.3rem' }}>🖼️</div>
-                              <p style={{ color: '#ffffff', fontWeight: 500, margin: '0.1rem 0', fontSize: '0.8rem' }}>
-                                Select thumbnail
-                              </p>
-                              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', margin: 0 }}>
-                                optional
-                              </p>
-                            </div>
-                          </>
+                          <div>
+                            <div style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>🖼️</div>
+                            <p style={{ color: '#ffffff', fontWeight: 500, margin: '0.1rem 0', fontSize: '0.75rem' }}>Select thumbnail</p>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', margin: 0 }}>optional</p>
+                          </div>
                         )}
                       </div>
                     </div>
+                    {/* Card preview */}
+                    {uploadThumbnailPreview && (
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', marginBottom: '0.35rem' }}>Preview card:</p>
+                        <div style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', maxWidth: '200px' }}>
+                          <div style={{ width: '100%', height: '112px', background: '#111', overflow: 'hidden' }}>
+                            <img src={uploadThumbnailPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          </div>
+                          <div style={{ padding: '0.45rem 0.6rem' }}>
+                            <p style={{ color: '#fff', fontSize: '0.72rem', fontWeight: 600, margin: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                              {uploadFormData.title || 'Video title'}
+                            </p>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.6rem', margin: '0.2rem 0 0' }}>{profile?.username}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1701,26 +1740,30 @@ const BrowsePage: React.FC = () => {
                     }}>
                       Sport
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="sport"
                       value={uploadFormData.sport}
                       onChange={handleUploadFormChange}
                       disabled={uploading}
-                      placeholder="e.g., Football, Basketball, Tennis"
                       style={{
                         width: '100%',
                         padding: '0.5rem 0.7rem',
                         borderRadius: '8px',
                         border: '1px solid rgba(255,255,255,0.25)',
-                        background: 'rgba(255,255,255,0.15)',
-                        color: '#ffffff',
+                        background: 'rgba(30,30,40,0.95)',
+                        color: uploadFormData.sport ? '#ffffff' : 'rgba(255,255,255,0.4)',
                         fontSize: '0.85rem',
                         boxSizing: 'border-box',
                         outline: 'none',
                         opacity: uploading ? 0.6 : 1,
+                        cursor: uploading ? 'not-allowed' : 'pointer',
                       }}
-                    />
+                    >
+                      <option value="" style={{ color: 'rgba(255,255,255,0.4)' }}>Select a sport...</option>
+                      {['Football', 'Basketball', 'Tennis', 'Boxing', 'Cycling', 'Rugby'].map(s => (
+                        <option key={s} value={s.toLowerCase()} style={{ color: '#ffffff' }}>{s}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Tags */}
@@ -1840,6 +1883,44 @@ const BrowsePage: React.FC = () => {
         )}
       </div>
     </div>
+
+    {/* Crop Modal */}
+    {cropModalOpen && cropSrc && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: '1.5rem' }}>
+        <div style={{ background: 'rgba(18,18,28,0.98)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '14px', padding: '1.5rem', maxWidth: '700px', width: '100%' }}>
+          <h3 style={{ color: '#ffffff', fontSize: '1rem', fontWeight: 700, margin: '0 0 0.5rem' }}>Crop thumbnail</h3>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem', margin: '0 0 1rem' }}>Select the desired area (16:9 ratio recommended)</p>
+          <div style={{ maxHeight: '55vh', overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+            <ReactCrop
+              crop={crop}
+              onChange={c => setCrop(c)}
+              onComplete={c => setCompletedCrop(c)}
+              aspect={16 / 9}
+              style={{ maxWidth: '100%' }}
+            >
+              <img
+                ref={imgRef}
+                src={cropSrc}
+                onLoad={onImageLoad}
+                style={{ maxWidth: '100%', maxHeight: '50vh', display: 'block' }}
+                alt="crop source"
+              />
+            </ReactCrop>
+          </div>
+          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+            <button
+              onClick={() => { setCropModalOpen(false); setCropSrc(''); }}
+              style={{ padding: '0.5rem 1.1rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', cursor: 'pointer' }}
+            >Cancel</button>
+            <button
+              onClick={handleCropConfirm}
+              style={{ padding: '0.5rem 1.2rem', background: '#008ddf', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+            >Apply crop</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import NavButtons from '../components/NavButtons';
 import { getUserProfile, subscribeToUser, unsubscribeFromUser, checkSubscription } from '../services/userService';
 import homeBg from '../assets/home.png';
 
@@ -203,37 +204,7 @@ const UserPage: React.FC = () => {
         padding: '2.5rem',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
       }}>
-        {/* Back to Browse */}
-<Link
-  to="/browse"
-  style={{
-    position: 'absolute',
-    top: '1rem',
-    left: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '36px',
-    height: '36px',
-    background: 'rgba(255, 255, 255, 0.08)',
-    border: '1px solid rgba(255, 255, 255, 0.15)',
-    borderRadius: '50%',
-    color: 'rgba(255, 255, 255, 0.7)',
-    textDecoration: 'none',
-    fontSize: '1.1rem',
-    transition: 'all 0.2s ease',
-  }}
-  onMouseEnter={e => {
-    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-    e.currentTarget.style.color = '#ffffff';
-  }}
-  onMouseLeave={e => {
-    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
-  }}
->
-  ←
-</Link>
+        <NavButtons />
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img
             src={profile.avatar || `https://i.pravatar.cc/150?u=${profile.id}`}

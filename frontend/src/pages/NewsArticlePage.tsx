@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getNewsArticle, getNews, type NewsArticle } from '../services/newsService';
 import homeBg from '../assets/home.png';
+import NavButtons from '../components/NavButtons';
 
 const NewsArticlePage: React.FC = () => {
   const { articleId } = useParams<{ articleId: string }>();
@@ -61,13 +62,11 @@ const NewsArticlePage: React.FC = () => {
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundImage: `url(${homeBg})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed', overflowY: 'auto', zIndex: 9999, fontFamily: "'Inter', sans-serif" }}>
+      <NavButtons />
       <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 100%)', pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '860px', margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
-        {/* Back */}
-        <button onClick={() => navigate(-1)} style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '0.4rem 1rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
-          ← Back
-        </button>
+        <div style={{ marginBottom: '1.5rem' }} />
 
         {/* Sport badge */}
         {article.sport && (

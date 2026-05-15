@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import NavButtons from '../components/NavButtons';
 import { getUserVideos } from '../services/userService';
 import VideoCard from '../components/VideoCard';
 
@@ -48,11 +49,7 @@ const UserVideosPage: React.FC = () => {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-4">
-          <Link to={`/users/${username}`} className="text-indigo-600 hover:text-indigo-800">
-            ← Back to profile
-          </Link>
-        </div>
+        <NavButtons />
         <h1 className="text-3xl font-bold text-gray-800 mb-8">Videos by {username}</h1>
         <div className="text-center">Loading videos...</div>
       </div>
@@ -62,11 +59,7 @@ const UserVideosPage: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-4">
-          <Link to={`/users/${username}`} className="text-indigo-600 hover:text-indigo-800">
-            ← Back to profile
-          </Link>
-        </div>
+        <NavButtons />
         <h1 className="text-3xl font-bold text-gray-800 mb-8">Videos by {username}</h1>
         <div className="text-center text-red-600">{error}</div>
       </div>

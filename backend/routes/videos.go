@@ -66,7 +66,7 @@ func UploadVideo(c *fiber.Ctx) error {
 	// Get metadata from form
 	title := c.FormValue("title")
 	description := c.FormValue("description")
-	sport := c.FormValue("sport") // football, basketball, etc.
+	sport := strings.ToLower(c.FormValue("sport")) // football, basketball, etc.
 	tags := c.FormValue("tags")   // comma-separated tags
 
 	// Validate required fields
@@ -203,7 +203,7 @@ func UpdateVideo(c *fiber.Ctx) error {
 		video.Description = updates.Description
 	}
 	if updates.Sport != "" {
-		video.Sport = updates.Sport
+		video.Sport = strings.ToLower(updates.Sport)
 	}
 	if updates.Tags != "" {
 		video.Tags = updates.Tags
@@ -297,9 +297,9 @@ func ListVideos(c *fiber.Ctx) error {
 	// Build query
 	query := database.DB.Model(&models.Video{}).Where("status = ?", "ready")
 
-	// Apply sport filter
+	// Apply sport filter (case-insensitive)
 	if sport != "" {
-		query = query.Where("sport = ?", sport)
+		query = query.Where("LOWER(sport) = LOWER(?)", sport)
 	}
 
 	// Apply search filter
